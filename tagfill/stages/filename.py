@@ -249,11 +249,23 @@ def run(ctx) -> None:
 
 def _apply_review(ctx) -> None:
     from .. import probe
-    from ..journal import ReviewQueue
+    from ..journal import Record, ReviewQueue
     accepted = ReviewQueue.load_accepted(ctx.from_review)
     n = 0
+    root = ctx.root.resolve()
     for row in accepted:
         path = ctx.root / row["path"]
+        # The review queue is a CSV a human edits, and accepted rows write
+        # with overwrite=True. "Nothing outside the collection is ever
+        # touched" has to be enforced, not just promised.
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            ctx.journal.append(Record(
+                stage="filename", path=row["path"], action="skip",
+                evidence={"reason": "review row points outside the "
+                                    "collection root"}))
+            continue
         if not path.exists():
             continue
         values = {k: row.get(f"proposed_{k}") for k in ("artist", "title",
