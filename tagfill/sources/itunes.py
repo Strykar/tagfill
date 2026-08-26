@@ -52,7 +52,10 @@ def search(*, album: str, local: list[float], tolerance: float,
             tracks = sorted(
                 (t for t in tr.json().get("results", [])
                  if t.get("wrapperType") == "track"),
-                key=lambda t: t.get("trackNumber") or 0)
+                # discNumber first, or a two-disc release interleaves and
+                # the duration vector never lines up.
+                key=lambda t: (t.get("discNumber") or 1,
+                               t.get("trackNumber") or 0))
         except Exception:
             continue
         vector = [(t.get("trackTimeMillis") or 0) / 1000.0 for t in tracks]

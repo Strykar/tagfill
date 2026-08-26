@@ -14,6 +14,8 @@ comes from.
 
 from __future__ import annotations
 
+import re
+
 from ..util import RateLimiter
 from . import SourceMatch, gate
 
@@ -42,9 +44,21 @@ def search(*, album: str, local: list[float], tolerance: float,
     budget — this is meant to catch the rare thing neither MusicBrainz
     nor iTunes has, not to be a bulk search tier."""
     import requests
-    headers = {"User-Agent": "tagfill/0.1 (+https://github.com)"}
+
+    from .. import __version__
+    headers = {"User-Agent":
+               f"tagfill/{__version__} (+https://github.com/Strykar/tagfill)"}
     try:
         limiter.wait()
+        # An external review called this endpoint a release blocker:
+        # "Discogs has required authentication on search since ~2014,
+        # unauthenticated requests get 401". Checked live twice, both with
+        # and without a user agent: HTTP 200, 50 results, and the
+        # x-discogs-ratelimit: 25 header this module's rate limit is set
+        # from comes back on this request, not on /releases/{id}. The
+        # production journal agrees -- art_from=discogs on 12 files of a
+        # real collection. Authentication raises the quota; it does not
+        # gate the endpoint.
         r = requests.get("https://api.discogs.com/database/search",
                          params={"q": album, "type": "release"},
                          headers=headers, timeout=30)
@@ -89,8 +103,12 @@ def search(*, album: str, local: list[float], tolerance: float,
                 pass
             return None
 
-        albumartist = "; ".join(a.get("name", "")
-                                for a in rel.get("artists", []))
+        # Discogs disambiguates same-named artists with a numeric suffix
+        # ("Prince (2)"). That is a database artefact, not part of the
+        # name, and writing it into a tag is wrong everywhere it lands.
+        albumartist = "; ".join(
+            re.sub(r"\s*\(\d+\)$", "", a.get("name", ""))
+            for a in rel.get("artists", []))
         genres = rel.get("genres") or []
         return SourceMatch(
             id=f"discogs:{rid}", title=rel.get("title", album),
