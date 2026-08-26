@@ -11,6 +11,15 @@ from pathlib import Path
 
 # Containers tagfill knows. probe.py is the only module that knows what
 # to *do* with each; this set only decides what counts as an audio file.
+# How to capture a helper's text output. Without an explicit encoding the
+# platform default decodes it, which on Windows is the ANSI code page --
+# ffmpeg and flac emit UTF-8, and their diagnostics quote the file path, so
+# one Cyrillic album name turns a readable error into mojibake or a
+# UnicodeDecodeError. errors="replace" because a message about a failure
+# must never itself raise.
+CAPTURE_TEXT = {"capture_output": True, "text": True,
+                "encoding": "utf-8", "errors": "replace"}
+
 AUDIO_SUFFIXES = {
     ".mp3", ".flac", ".ogg", ".opus", ".m4a", ".mp4",
     ".aiff", ".aif", ".aifc", ".wav",

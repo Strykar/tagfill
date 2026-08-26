@@ -33,7 +33,7 @@ class TagBackup:
         self.path = d / "tags.jsonl"
         self._seen: set[str] = set()
         if self.path.exists():
-            with open(self.path) as f:
+            with open(self.path, encoding="utf-8") as f:
                 for line in f:
                     try:
                         self._seen.add(json.loads(line)["path"])
@@ -53,14 +53,14 @@ class TagBackup:
                "fields": {f: tags.get(f) for f in probe.FIELDS},
                "art": base64.b64encode(art[0]).decode() if art else None,
                "art_mime": art[1] if art else None}
-        with open(self.path, "a") as f:
+        with open(self.path, "a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         self._seen.add(rel)
 
 
 def restore(root: Path, backup_file: Path, only: str | None = None) -> int:
     n = 0
-    with open(backup_file) as f:
+    with open(backup_file, encoding="utf-8") as f:
         for line in f:
             try:
                 rec = json.loads(line)

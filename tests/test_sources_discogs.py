@@ -139,7 +139,7 @@ def test_wrong_durations_are_rejected():
 
 def test_mb_orchestrator_lists_discogs_after_itunes():
     src = Path(__file__).resolve().parents[1] / "tagfill" / "stages" / "mb.py"
-    text = src.read_text()
+    text = src.read_text(encoding="utf-8")
     idx_itunes = text.index("itunes.search,")
     idx_discogs = text.index("discogs.search,", idx_itunes)
     assert idx_discogs > idx_itunes, (
@@ -148,6 +148,6 @@ def test_mb_orchestrator_lists_discogs_after_itunes():
 
 def test_discogs_uses_its_own_rate_limiter_not_musicbrainzs():
     src = Path(__file__).resolve().parents[1] / "tagfill" / "stages" / "mb.py"
-    text = src.read_text()
+    text = src.read_text(encoding="utf-8")
     assert "discogs_limiter = RateLimiter(2.5)" in text
     assert '"limiter": discogs_limiter' in text

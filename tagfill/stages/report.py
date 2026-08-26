@@ -43,7 +43,7 @@ def run(ctx: Context) -> None:
 
     progress = []
     if baseline_existed:
-        with open(baseline_path, newline="") as f:
+        with open(baseline_path, newline="", encoding="utf-8") as f:
             baseline_rows = list(csv.DictReader(f))
         was = census.missing_paths(baseline_rows, ctx.cfg.art_min_px)
         now = census.missing_paths(rows, ctx.cfg.art_min_px)
@@ -65,7 +65,7 @@ def run(ctx: Context) -> None:
     stage_counts: dict[str, dict[str, int]] = defaultdict(
         lambda: defaultdict(int))
     if jpath.exists():
-        with open(jpath) as f:
+        with open(jpath, encoding="utf-8") as f:
             for line in f:
                 try:
                     d = json.loads(line)
@@ -108,11 +108,13 @@ def run(ctx: Context) -> None:
                 )) or "(none)",
             })
 
-    with open(report_dir / "unresolved.csv", "w", newline="") as f:
+    with open(report_dir / "unresolved.csv", "w", newline="",
+              encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["path", "missing", "tried"])
         w.writeheader()
         w.writerows(unresolved)
-    with open(report_dir / "reacquire.csv", "w", newline="") as f:
+    with open(report_dir / "reacquire.csv", "w", newline="",
+              encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["path", "issue"])
         w.writeheader()
         w.writerows(reacquire)

@@ -34,7 +34,7 @@ def _setup(tmp_path, rel_path):
     cfg = config.Config()
     cfg.root, cfg.workdir = root, tmp_path / "work"
     queue = tmp_path / "review.csv"
-    with open(queue, "w", newline="") as f:
+    with open(queue, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=ReviewQueue.FIELDS)
         w.writeheader()
         w.writerow({"path": rel_path, "stage": "filename",
@@ -57,7 +57,7 @@ def _mp3(path, **tags):
 
 
 def _skips(ctx):
-    with open(ctx.journal.path) as f:
+    with open(ctx.journal.path, encoding="utf-8") as f:
         return [json.loads(line) for line in f
                 if json.loads(line)["action"] == "skip"]
 

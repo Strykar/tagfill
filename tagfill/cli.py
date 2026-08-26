@@ -104,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
         if out.exists():
             print(f"{out} already exists; not overwriting")
             return 1
-        out.write_text(config.EXAMPLE)
+        out.write_text(config.EXAMPLE, encoding="utf-8")
         print(f"wrote {out}; edit [collection].root and go")
         return 0
 

@@ -48,14 +48,15 @@ def test_clutter_is_ignored_and_a_fake_mp3_is_reported_not_fatal(tmp_path):
                     str(album / "01 real.mp3")], check=True)
 
     for name in ("info.nfo", "rip.log", "album.cue", "list.m3u", "notes.txt"):
-        (album / name).write_text("not audio\n")
+        (album / name).write_text("not audio\n", encoding="utf-8")
     (album / "booklet.pdf").write_bytes(b"%PDF-1.4 fake")
     (album / "cover.jpg").write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 64)
     (album / "Scans" / "front.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
     # An audio extension that is not audio.
-    (album / "fake.mp3").write_text("plain text pretending to be an mp3\n")
+    (album / "fake.mp3").write_text(
+        "plain text pretending to be an mp3\n", encoding="utf-8")
     # Hidden directories are outside the file universe entirely.
-    (root / ".hidden" / "hidden.mp3").write_text("x\n")
+    (root / ".hidden" / "hidden.mp3").write_text("x\n", encoding="utf-8")
 
     ctx = _ctx(tmp_path, root)
     rows = census.collect(ctx)  # must not raise
@@ -77,7 +78,7 @@ def test_clutter_is_ignored_and_a_fake_mp3_is_reported_not_fatal(tmp_path):
 def test_a_directory_with_no_audio_at_all_is_not_an_error(tmp_path):
     root = tmp_path / "music"
     root.mkdir()
-    (root / "readme.txt").write_text("nothing to see\n")
+    (root / "readme.txt").write_text("nothing to see\n", encoding="utf-8")
     (root / "pic.jpg").write_bytes(b"\xff\xd8\xff\xe0")
 
     ctx = _ctx(tmp_path, root)
@@ -133,7 +134,7 @@ def test_one_unwritable_file_does_not_abort_the_batch(tmp_path):
             "the file after the unwritable one must still be processed")
 
         import json
-        with open(ctx.workdir / "journal.jsonl") as jf:
+        with open(ctx.workdir / "journal.jsonl", encoding="utf-8") as jf:
             skips = [json.loads(line) for line in jf]
         assert any(r.get("action") == "skip"
                    and "write failed" in r.get("evidence", {}).get("reason", "")

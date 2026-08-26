@@ -52,7 +52,7 @@ def test_no_stage_selects_targets_on_raw_has_art():
     bad = re.compile(r'not\s+r\[["\']has_art["\']\]')
     offenders = []
     for p in sorted(STAGES.glob("*.py")):
-        for n, line in enumerate(p.read_text().splitlines(), 1):
+        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
             if bad.search(line):
                 offenders.append(f"{p.name}:{n}: {line.strip()}")
     assert not offenders, (
@@ -62,7 +62,7 @@ def test_no_stage_selects_targets_on_raw_has_art():
 
 def test_every_stage_that_embeds_art_uses_the_shared_predicate():
     for name in ("mb.py", "itunes.py", "art_local.py"):
-        src = (STAGES / name).read_text()
+        src = (STAGES / name).read_text(encoding="utf-8")
         assert "row_needs_art" in src, f"{name} does not use row_needs_art"
 
 
@@ -71,7 +71,7 @@ def test_every_stage_that_embeds_art_uses_the_shared_predicate():
 def test_review_apply_overwrites_because_accept_is_authorization():
     """An accepted review row must actually write, even over a non-empty
     field. Deferring to --overwrite made accepted rows silently no-op."""
-    src = (STAGES / "filename.py").read_text()
+    src = (STAGES / "filename.py").read_text(encoding="utf-8")
     body = src.split("def _apply_review")[1]
     assert "overwrite=True" in body, \
         "_apply_review must overwrite; the human accept is the authorization"
@@ -79,6 +79,6 @@ def test_review_apply_overwrites_because_accept_is_authorization():
 
 
 def test_polluted_title_is_queued_not_silently_skipped():
-    src = (STAGES / "filename.py").read_text()
+    src = (STAGES / "filename.py").read_text(encoding="utf-8")
     assert "polluted_title" in src
     assert "startswith" in src

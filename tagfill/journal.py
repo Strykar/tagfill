@@ -46,12 +46,18 @@ class Journal:
         self.counts: dict[tuple[str, str], int] = {}
         self._applied: dict[tuple[str, str], dict] | None = None
 
+    # Every text handle in the persistence layer names its encoding. The
+    # platform default on Windows is the ANSI code page, and this file gets
+    # json.dumps(ensure_ascii=False) on every decision -- so the first
+    # Cyrillic, CJK or Devanagari path would raise UnicodeEncodeError
+    # mid-stage on a collection that works fine on Linux. newline="\n"
+    # keeps journals from going diff-noisy across machines.
     def append(self, rec: Record) -> None:
         assert rec.action in ACTIONS, rec.action
         rec.ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         key = (rec.stage, rec.action)
         self.counts[key] = self.counts.get(key, 0) + 1
-        with open(self.path, "a") as f:
+        with open(self.path, "a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec.__dict__, ensure_ascii=False) + "\n")
 
     def record_write(self, stage: str, root: Path, path: Path, field: str,
@@ -74,7 +80,7 @@ class Journal:
         if self._applied is None:
             self._applied = {}
             if self.path.exists():
-                with open(self.path) as f:
+                with open(self.path, encoding="utf-8") as f:
                     for line in f:
                         try:
                             d = json.loads(line)
@@ -117,7 +123,7 @@ class ReviewQueue:
         self.path = report / "review-queue.csv"
         self._seen: set[str] = set()
         if self.path.exists():
-            with open(self.path, newline="") as f:
+            with open(self.path, newline="", encoding="utf-8") as f:
                 for existing in csv.DictReader(f):
                     self._seen.add(existing.get("path", ""))
 
@@ -126,7 +132,7 @@ class ReviewQueue:
         if row.get("path", "") in self._seen:
             return
         new_file = not self.path.exists()
-        with open(self.path, "a", newline="") as f:
+        with open(self.path, "a", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=self.FIELDS)
             if new_file:
                 w.writeheader()
@@ -136,7 +142,7 @@ class ReviewQueue:
     @staticmethod
     def load_accepted(path: Path) -> list[dict]:
         out = []
-        with open(path, newline="") as f:
+        with open(path, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
                 if str(row.get("accept", "")).strip().lower() in (
                         "y", "yes", "1", "true"):

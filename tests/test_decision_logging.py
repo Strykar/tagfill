@@ -43,7 +43,7 @@ def _ctx(tmp_path, root, **overrides):
 
 def _write_census(ctx, rows):
     ctx.workdir.mkdir(parents=True, exist_ok=True)
-    with open(ctx.workdir / "census.csv", "w", newline="") as f:
+    with open(ctx.workdir / "census.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=census.COLUMNS)
         w.writeheader()
         for row in rows:
@@ -54,7 +54,7 @@ def _write_census(ctx, rows):
 
 def _journal_records(ctx):
     import json
-    with open(ctx.workdir / "journal.jsonl") as f:
+    with open(ctx.workdir / "journal.jsonl", encoding="utf-8") as f:
         return [json.loads(line) for line in f]
 
 

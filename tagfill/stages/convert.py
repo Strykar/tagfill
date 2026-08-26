@@ -38,6 +38,7 @@ import sys
 
 from .. import probe
 from ..journal import Record
+from ..util import CAPTURE_TEXT
 from . import Context, guarded_write
 
 _PCM_TOLERANCE = 1.0 / (1 << 22)  # ~ one 24-bit quantization step
@@ -61,7 +62,7 @@ def _sample_fmt(path) -> str:
         ["ffprobe", "-v", "error", "-select_streams", "a:0",
          "-show_entries", "stream=sample_fmt", "-of",
          "default=nw=1:nk=1", str(path)],
-        capture_output=True, text=True)
+        **CAPTURE_TEXT)
     return r.stdout.strip()
 
 
@@ -127,13 +128,13 @@ def _encode_float_wav(src, dst, tmp_dir) -> tuple[bool, dict]:
         r = subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-i", str(src),
              "-c:a", "pcm_s24le", str(intermediate)],
-            capture_output=True, text=True)
+            **CAPTURE_TEXT)
         if r.returncode != 0:
             return False, {"reason": "ffmpeg requantize failed",
                           "stderr": r.stderr[-500:]}
 
         r = subprocess.run(["flac", "-V", "--best", "-s", "-o", str(dst),
-                            str(intermediate)], capture_output=True, text=True)
+                            str(intermediate)], **CAPTURE_TEXT)
         if r.returncode != 0:
             return False, {"reason": "flac -V failed on requantized audio",
                           "stderr": r.stderr[-500:]}
@@ -185,7 +186,7 @@ def run(ctx: Context) -> None:
                 continue
         else:
             r = subprocess.run(["flac", "-V", "--best", "-s", "-o", str(dst),
-                                str(src)], capture_output=True, text=True)
+                                str(src)], **CAPTURE_TEXT)
             if r.returncode != 0:
                 dst.unlink(missing_ok=True)
                 ctx.journal.append(Record(stage="convert", path=row["path"],

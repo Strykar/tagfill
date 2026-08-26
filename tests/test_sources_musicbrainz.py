@@ -48,7 +48,7 @@ def test_top_genre_empty_when_no_tags_anywhere():
 def test_get_release_by_id_requests_artist_credits():
     src = (Path(__file__).resolve().parents[1] / "tagfill" / "sources"
           / "musicbrainz.py")
-    text = src.read_text()
+    text = src.read_text(encoding="utf-8")
     call = text[text.index("get_release_by_id("):]
     includes_block = call[:call.index(")")]
     assert "artist-credits" in includes_block, (

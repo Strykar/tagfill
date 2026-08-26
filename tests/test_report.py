@@ -185,13 +185,13 @@ def test_repeated_journal_entries_across_runs_are_deduped(tmp_path):
            '"action": "reject", "field": "release", '
            '"evidence": {"reason": "no candidate passed the gate"}, '
            '"ts": "2026-08-2%d"}\n')
-    with open(ctx.workdir / "journal.jsonl", "w") as f:
+    with open(ctx.workdir / "journal.jsonl", "w", encoding="utf-8") as f:
         for day in (1, 2, 3):
             f.write(line % day)
 
     report.run(ctx)
 
-    with open(ctx.workdir / "report" / "unresolved.csv") as f:
+    with open(ctx.workdir / "report" / "unresolved.csv", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     row = next(r for r in rows if r["path"] == "Some Album/01 Track.mp3")
     assert row["tried"] == "mb: no candidate passed the gate", (

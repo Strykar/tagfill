@@ -112,7 +112,7 @@ def run(ctx: Context) -> None:
     rows = collect(ctx)
     ctx.workdir.mkdir(parents=True, exist_ok=True)
     out = ctx.workdir / "census.csv"
-    with open(out, "w", newline="") as f:
+    with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=COLUMNS)
         w.writeheader()
         w.writerows(rows)
@@ -141,7 +141,7 @@ def load(ctx: Context) -> list[dict]:
     out = ctx.workdir / "census.csv"
     if not out.exists():
         run(ctx)
-    with open(out, newline="") as f:
+    with open(out, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     return _fold_in_later_writes(ctx, rows, out.stat().st_mtime)
 
@@ -180,7 +180,7 @@ def _applied_since(ctx: Context, census_mtime: float) -> dict[str, dict]:
     out: dict[str, dict] = {}
     if not ctx.journal.path.exists():
         return out
-    with open(ctx.journal.path) as f:
+    with open(ctx.journal.path, encoding="utf-8") as f:
         for line in f:
             try:
                 d = json.loads(line)

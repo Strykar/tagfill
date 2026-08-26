@@ -57,9 +57,9 @@ def test_review_queue_accept_parsing():
         rq.add({"path": "b.mp3", "stage": "filename",
                 "proposed_artist": "B", "proposed_title": "U",
                 "confidence": 0.3})
-        text = rq.path.read_text().replace(
+        text = rq.path.read_text(encoding="utf-8").replace(
             "a.mp3,filename,A,T,,0.4,,", "a.mp3,filename,A,T,,0.4,,y")
-        rq.path.write_text(text)
+        rq.path.write_text(text, encoding="utf-8")
         accepted = ReviewQueue.load_accepted(rq.path)
         assert [r["path"] for r in accepted] == ["a.mp3"]
 
@@ -67,7 +67,7 @@ def test_review_queue_accept_parsing():
 def test_config_defaults_and_example_parse():
     with tempfile.TemporaryDirectory() as td:
         p = Path(td) / "tagfill.toml"
-        p.write_text(config.EXAMPLE)
+        p.write_text(config.EXAMPLE, encoding="utf-8")
         cfg = config.load(p)
         assert cfg.art_min_px == 300
         assert cfg.mb_rate_s == 1.0
@@ -196,7 +196,7 @@ def test_recheck_is_honoured_by_every_stage_that_uses_the_resume_guard():
     stages = P(__file__).resolve().parents[1] / "tagfill" / "stages"
     offenders = []
     for f in sorted(stages.glob("*.py")):
-        text = f.read_text()
+        text = f.read_text(encoding="utf-8")
         for m in re.finditer(r"already_done\(", text):
             window = text[max(0, m.start() - 200):m.start()]
             if "ctx.recheck" not in window:
@@ -227,7 +227,7 @@ def test_every_stored_path_uses_one_separator_convention():
     pkg = P(__file__).resolve().parents[1] / "tagfill"
     offenders = []
     for f in sorted(pkg.rglob("*.py")):
-        for n, line in enumerate(f.read_text().splitlines(), 1):
+        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             if re.search(r"str\(\s*\w+\.relative_to\(", line):
                 offenders.append(f"{f.name}:{n}")
     assert not offenders, (

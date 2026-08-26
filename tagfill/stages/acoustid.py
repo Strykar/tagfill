@@ -21,13 +21,13 @@ import shutil
 import subprocess
 
 from ..journal import Record
-from ..util import RateLimiter, is_mb_placeholder
+from ..util import CAPTURE_TEXT, RateLimiter, is_mb_placeholder
 from . import Context, guarded_write
 
 
 def _fingerprint(path) -> tuple[int, str] | None:
     r = subprocess.run(["fpcalc", "-json", "-length", "120", str(path)],
-                       capture_output=True, text=True)
+                       **CAPTURE_TEXT)
     if r.returncode != 0:
         return None
     try:

@@ -70,7 +70,7 @@ def _ctx(tmp_path, root, extra_tags):
 
 def _write_census(ctx, paths):
     ctx.workdir.mkdir(parents=True, exist_ok=True)
-    with open(ctx.workdir / "census.csv", "w", newline="") as f:
+    with open(ctx.workdir / "census.csv", "w", newline="", encoding="utf-8") as f:
         import csv
         w = csv.DictWriter(f, fieldnames=census.COLUMNS)
         w.writeheader()

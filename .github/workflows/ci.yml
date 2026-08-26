@@ -33,3 +33,9 @@ jobs:
         run: ruff check tagfill/ tests/ packaging/
       - run: python tests/make_fixtures.py
       - run: pytest tests/ -q
+      # CPython's own detector for the bug class that would have taken down
+      # every Windows run on a non-ASCII collection: a text handle with no
+      # encoding= takes the ANSI code page there. The warning fires on any
+      # platform, so one Linux leg is enough to keep it from coming back.
+      - if: matrix.lint
+        run: python -X warn_default_encoding -W error::EncodingWarning -m pytest tests/ -q

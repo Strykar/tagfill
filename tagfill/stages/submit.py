@@ -22,6 +22,7 @@ import csv
 import json
 import os
 
+from ..util import CAPTURE_TEXT
 from . import Context
 
 
@@ -31,7 +32,7 @@ def run(ctx: Context) -> None:
         ctx.say("submit: no journal; run stage 5 first")
         return
     candidates = {}
-    with open(jpath) as f:
+    with open(jpath, encoding="utf-8") as f:
         for line in f:
             try:
                 d = json.loads(line)
@@ -59,7 +60,8 @@ def run(ctx: Context) -> None:
 
     report_dir = ctx.workdir / "report"
     report_dir.mkdir(parents=True, exist_ok=True)
-    with open(report_dir / "mb-additions.csv", "w", newline="") as f:
+    with open(report_dir / "mb-additions.csv", "w", newline="",
+              encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["path", "artist", "title", "note"])
         for path, r, _ in ready:
@@ -86,7 +88,7 @@ def run(ctx: Context) -> None:
     for path, r, ev in ready:
         full = ctx.root / path
         res = subprocess.run(["fpcalc", "-json", str(full)],
-                             capture_output=True, text=True)
+                             **CAPTURE_TEXT)
         if res.returncode != 0:
             continue
         fp = json.loads(res.stdout)

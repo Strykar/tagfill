@@ -141,7 +141,7 @@ def test_search_request_failure_returns_none_not_an_exception():
 
 def test_mb_orchestrator_lists_itunes_after_musicbrainz():
     src = Path(__file__).resolve().parents[1] / "tagfill" / "stages" / "mb.py"
-    text = src.read_text()
+    text = src.read_text(encoding="utf-8")
     idx_mb = text.index("musicbrainz.search,")
     idx_itunes = text.index("itunes.search,", idx_mb)
     assert idx_itunes > idx_mb, (

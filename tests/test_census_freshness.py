@@ -31,7 +31,7 @@ def _ctx_with_census(tmp_path):
     cfg.workdir = tmp_path / "work"
     (cfg.root / "Album").mkdir(parents=True)
     cfg.workdir.mkdir(parents=True)
-    (cfg.workdir / "census.csv").write_text(HEADER + ROW)
+    (cfg.workdir / "census.csv").write_text(HEADER + ROW, encoding="utf-8")
     ctx = Context(cfg=cfg, journal=Journal(cfg.workdir),
                   review=ReviewQueue(cfg.workdir))
     return ctx, (cfg.workdir / "census.csv").stat().st_mtime
@@ -71,7 +71,7 @@ def test_a_write_older_than_the_census_does_not_override_it(tmp_path):
 
 def test_a_corrupt_journal_line_does_not_take_the_census_down(tmp_path):
     ctx, taken = _ctx_with_census(tmp_path)
-    with open(ctx.journal.path, "a") as f:
+    with open(ctx.journal.path, "a", encoding="utf-8") as f:
         f.write("{not json\n")
     _applied(ctx, "genre", "Techno", taken + 10)
     assert census.load(ctx)[0]["genre"] == "Techno"

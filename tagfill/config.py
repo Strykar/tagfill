@@ -131,7 +131,7 @@ class Config:
             return os.environ["ACOUSTID_API_KEY"]
         kf = Path(os.path.expanduser(self.acoustid_key_file))
         if kf.is_file():
-            return kf.read_text().strip()
+            return kf.read_text(encoding="utf-8").strip()
         return ""
 
 

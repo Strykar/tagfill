@@ -51,7 +51,7 @@ def _write_census(ctx, root):
 
     from tagfill.stages import census
     ctx.workdir.mkdir(parents=True, exist_ok=True)
-    with open(ctx.workdir / "census.csv", "w", newline="") as f:
+    with open(ctx.workdir / "census.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=census.COLUMNS)
         w.writeheader()
         for name in ("a.mp3", "b.mp3"):
@@ -75,7 +75,7 @@ def test_one_failed_request_does_not_abort_remaining_files(
         acoustid.run(ctx)
 
     import json
-    with open(ctx.workdir / "journal.jsonl") as f:
+    with open(ctx.workdir / "journal.jsonl", encoding="utf-8") as f:
         seen_paths = {json.loads(line).get("path") for line in f}
     assert seen_paths == {"a.mp3", "b.mp3"}, (
         "both files must have a journal record; the second file must not "
@@ -85,7 +85,7 @@ def test_one_failed_request_does_not_abort_remaining_files(
 def test_failed_request_is_journaled_not_silently_swallowed():
     src = (Path(__file__).resolve().parents[1]
            / "tagfill" / "stages" / "acoustid.py")
-    text = src.read_text()
+    text = src.read_text(encoding="utf-8")
     assert 'action="skip"' in text and '"reason": "lookup failed"' in text
     # the exact bug: a bare `break` inside the per-file try/except that
     # would abort the whole remaining batch on one transient failure

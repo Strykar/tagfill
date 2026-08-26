@@ -48,7 +48,7 @@ def _ctx(tmp_path, root):
 
 def _write_census(ctx, rows):
     ctx.workdir.mkdir(parents=True, exist_ok=True)
-    with open(ctx.workdir / "census.csv", "w", newline="") as f:
+    with open(ctx.workdir / "census.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=census.COLUMNS)
         w.writeheader()
         for path, artist, album in rows:
@@ -134,7 +134,7 @@ def test_a_real_album_folder_still_groups_its_tracks_together(
 
 def test_grouping_key_is_folder_artist_album_not_folder_alone():
     src = Path(__file__).resolve().parents[1] / "tagfill" / "stages" / "itunes.py"
-    text = src.read_text()
+    text = src.read_text(encoding="utf-8")
     assert 'key = (str(Path(r["path"]).parent), r["artist"], r["album"])' in text
     assert 'rows[0]["artist"], rows[0]["album"]' not in text, (
         "the exact bug: using only the first row's artist/album as the "

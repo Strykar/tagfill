@@ -44,7 +44,7 @@ def _ctx(tmp_path, *, apply):
 
 def _census(ctx, rows):
     ctx.workdir.mkdir(parents=True, exist_ok=True)
-    with open(ctx.workdir / "census.csv", "w", newline="") as f:
+    with open(ctx.workdir / "census.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=census.COLUMNS)
         w.writeheader()
         for row in rows:
@@ -94,7 +94,7 @@ def test_an_apply_run_with_art_everywhere_does_not_fetch(tmp_path,
     and no reason to spend the request."""
     calls = []
     ctx = _ctx(tmp_path, apply=True)
-    with open(ctx.workdir / "census.csv", newline="") as f:
+    with open(ctx.workdir / "census.csv", newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     for r in rows:
         r["has_art"], r["art_min_px"] = "1", "2000"
