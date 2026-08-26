@@ -284,7 +284,8 @@ def _atomic_save(path: Path, mutate) -> None:
         raise
 
 
-def write(path: Path, values: dict[str, str], overwrite: bool = False
+def write(path: Path, values: dict[str, str], overwrite: bool = False,
+          art: tuple[bytes, str] | None = None, art_min_px: int = 0
           ) -> list[tuple[str, str | None, str]]:
     """Write fields; returns [(field, old, new)] actually changed.
     Never overwrites a non-empty field unless overwrite=True.
@@ -298,7 +299,16 @@ def write(path: Path, values: dict[str, str], overwrite: bool = False
     journal is the record everything else trusts. So re-read and report only
     fields that actually landed. Values a container normalises rather than
     drops (ID3 rewriting "1994-03-28T00:00:00" as "1994-03-28 00:00:00")
-    still count as written."""
+    still count as written.
+
+    `art` is (bytes, mime) to embed in the same save, and only if this file
+    needs it -- absent, below art_min_px, or unreadable. Fields and art
+    used to be two calls, so a 60 MB FLAC getting a date and a cover paid
+    two full copy/parse/save/fsync cycles, about 240 MB of I/O and five
+    container parses for one logical change. The read this function
+    already does answers the needs-art question too, so batching costs
+    nothing and removes a parse as well.
+    """
     current = read(path)
     todo = {}
     changed = []
@@ -312,12 +322,20 @@ def write(path: Path, values: dict[str, str], overwrite: bool = False
             continue
         todo[name] = str(new)
         changed.append((name, old, str(new)))
-    if not todo:
+
+    want_art = art is not None and (
+        not current.has_art
+        or bool(current.art_error)
+        or (current.art_min_px is not None
+            and current.art_min_px < art_min_px))
+    if not todo and not want_art:
         return []
 
     def _mutate(audio, family):
         if audio.tags is None:
             audio.add_tags()
+        if want_art:
+            _mutate_art(audio, family, art[0], art[1])
         if family == "id3":
             for name, val in todo.items():
                 fid, cls = _ID3_FRAMES[name]
@@ -357,6 +375,10 @@ def write(path: Path, values: dict[str, str], overwrite: bool = False
         stored = str(after.get(name) or "")
         if stored.strip() != str(old or "").strip():
             out.append((name, old, stored))
+    # Reported the same way as a field: what the file holds now, not what
+    # was asked for.
+    if want_art and after.has_art:
+        out.append(("art", None, f"{after.art_min_px}px"))
     return out
 
 
@@ -426,37 +448,39 @@ def _read_art_from(audio, family) -> tuple[bytes, str] | None:
     return None
 
 
-def embed_art(path: Path, data: bytes, mime: str) -> None:
-    def _mutate(audio, family):
-        if family == "id3":
-            if audio.tags is None:
-                audio.add_tags()
-            audio.tags.delall("APIC")
-            audio.tags.add(APIC(encoding=3, mime=mime, type=3,
-                                desc="Front cover", data=data))
-        elif family == "vorbis":
-            pic = Picture()
-            pic.type = 3
-            pic.mime = mime
-            pic.desc = "Front cover"
-            pic.data = data
-            _set_dimensions(pic, data)
-            if isinstance(audio, FLAC):
-                audio.clear_pictures()
-                audio.add_picture(pic)
-            else:
-                if audio.tags is None:
-                    audio.add_tags()
-                audio.tags["metadata_block_picture"] = [
-                    base64.b64encode(pic.write()).decode("ascii")]
+def _mutate_art(audio, family, data: bytes, mime: str) -> None:
+    if family == "id3":
+        if audio.tags is None:
+            audio.add_tags()
+        audio.tags.delall("APIC")
+        audio.tags.add(APIC(encoding=3, mime=mime, type=3,
+                            desc="Front cover", data=data))
+    elif family == "vorbis":
+        pic = Picture()
+        pic.type = 3
+        pic.mime = mime
+        pic.desc = "Front cover"
+        pic.data = data
+        _set_dimensions(pic, data)
+        if isinstance(audio, FLAC):
+            audio.clear_pictures()
+            audio.add_picture(pic)
         else:
             if audio.tags is None:
                 audio.add_tags()
-            fmt = (MP4Cover.FORMAT_PNG if mime == "image/png"
-                   else MP4Cover.FORMAT_JPEG)
-            audio.tags["covr"] = [MP4Cover(data, imageformat=fmt)]
+            audio.tags["metadata_block_picture"] = [
+                base64.b64encode(pic.write()).decode("ascii")]
+    else:
+        if audio.tags is None:
+            audio.add_tags()
+        fmt = (MP4Cover.FORMAT_PNG if mime == "image/png"
+               else MP4Cover.FORMAT_JPEG)
+        audio.tags["covr"] = [MP4Cover(data, imageformat=fmt)]
 
-    _atomic_save(path, _mutate)
+
+def embed_art(path: Path, data: bytes, mime: str) -> None:
+    _atomic_save(path, lambda audio, family:
+                 _mutate_art(audio, family, data, mime))
 
 
 def remove_art(path: Path) -> None:

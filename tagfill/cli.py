@@ -74,6 +74,9 @@ def _build_parser() -> argparse.ArgumentParser:
     runp.add_argument("--convert-wav", action="store_true",
                       help="also run stage 1, WAV to FLAC conversion")
 
+    sub.add_parser("compact",
+                   help="shrink journal.jsonl to the records that still "
+                        "matter")
     rp = sub.add_parser("restore", help="undo from backup/tags.jsonl")
     rp.add_argument("--only", help="restore a single relative path")
     return p
@@ -129,6 +132,11 @@ def main(argv: list[str] | None = None) -> int:
         ctx = Context(cfg=cfg, journal=Journal(cfg.workdir),
                       review=ReviewQueue(cfg.workdir))
         report.run(ctx)
+        return 0
+
+    if args.command == "compact":
+        before, after = Journal(cfg.workdir).compact()
+        print(f"journal: {before} records -> {after}")
         return 0
 
     if args.command == "restore":

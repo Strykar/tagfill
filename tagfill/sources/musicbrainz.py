@@ -46,7 +46,9 @@ refuses to run this source at all without one.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import json
 from pathlib import Path
 
 from ..util import RateLimiter, is_mb_placeholder, similarity
@@ -75,6 +77,35 @@ def _http_cached(url: str, cache_dir: Path, limiter: RateLimiter,
         return None
     key.write_bytes(r.content)
     return r.content
+
+
+def _json_cached(cache_dir: Path, key_parts: tuple, limiter: RateLimiter,
+                 fetch):
+    """Cache a musicbrainzngs call the way art is already cached.
+
+    Only art went through a cache, so a crash partway through mb -- or the
+    stale-census re-query this tool had until recently -- re-spent the
+    whole MusicBrainz budget from zero. At 1 req/s, 5,000 unmatched folders
+    times a search plus up to eight release fetches is a ten-hour ceiling,
+    which makes retry economics the difference between "resume" and "start
+    again tomorrow".
+
+    Only successful responses land in the cache; a failure is a failure
+    now, not forever.
+    """
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    key = cache_dir / (hashlib.sha1(
+        "\x00".join(str(p) for p in key_parts).encode()).hexdigest() + ".json")
+    if key.exists():
+        try:
+            return json.loads(key.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass                # a half-written cache file is not an error
+    limiter.wait()
+    result = fetch()
+    with contextlib.suppress(OSError, TypeError, ValueError):
+        key.write_text(json.dumps(result), encoding="utf-8")
+    return result
 
 
 def _top_genre(release: dict) -> str:
@@ -141,24 +172,28 @@ def search(*, artist: str | None, album: str, compilation: bool,
         return None, []
     musicbrainzngs.set_useragent(mb_app, tool_version, mb_contact)
 
-    limiter.wait()
     try:
         if compilation:
-            result = musicbrainzngs.search_releases(release=album, limit=8)
+            result = _json_cached(
+                cache_dir, ("search", album, "va"), limiter,
+                lambda: musicbrainzngs.search_releases(release=album, limit=8))
         else:
-            result = musicbrainzngs.search_releases(artist=artist,
-                                                    release=album, limit=8)
+            result = _json_cached(
+                cache_dir, ("search", album, artist), limiter,
+                lambda: musicbrainzngs.search_releases(artist=artist,
+                                                      release=album, limit=8))
     except Exception:
         return None, []
 
     rejections = []
     for cand in result.get("release-list", []):
         rid = cand["id"]
-        limiter.wait()
         try:
-            rel = musicbrainzngs.get_release_by_id(
-                rid, includes=["recordings", "release-groups",
-                              "artist-credits", "tags"])["release"]
+            rel = _json_cached(
+                cache_dir, ("release", rid), limiter,
+                lambda rid=rid: musicbrainzngs.get_release_by_id(
+                    rid, includes=["recordings", "release-groups",
+                                   "artist-credits", "tags"]))["release"]
         except Exception:
             continue
         vectors = _duration_vectors(rel)

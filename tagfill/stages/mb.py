@@ -53,7 +53,7 @@ def run(ctx: Context) -> None:
     discogs_limiter = RateLimiter(2.5)  # 25 req/min unauthenticated, own budget
     cache = ctx.workdir / "cache" / "http"
     from . import census
-    from .art_local import needs_art, row_needs_art
+    from .art_local import row_needs_art
 
     tol = ctx.cfg.mb_duration_tolerance_s
     pass_fraction = ctx.cfg.mb_vector_pass_fraction
@@ -192,6 +192,24 @@ def run(ctx: Context) -> None:
         # positional across the whole release, numbering disc 2 from 13.
         positional = (match.evidence.get("order") == "positional"
                       and not match.evidence.get("multi_medium"))
+        # Once per folder, not once per track: decoding a 1200x1200 JPEG
+        # sixteen times to embed the same bytes sixteen times is pure
+        # waste. min_px=0 so an image that decodes but is too small stays
+        # distinguishable from one that is not an image at all.
+        checked = probe.validate_art(art, 0) if art else None
+        usable = checked if checked and checked[2] >= ctx.cfg.art_min_px \
+            else None
+        if art and not usable:
+            # Found live: a source had real art for this release but under
+            # the size floor -- the decline is correct, but silence here
+            # looked identical to "no art fetch attempted" from outside.
+            for row in rows:
+                ctx.journal.append(Record(
+                    stage="mb", path=row["path"], action="reject",
+                    field="art",
+                    evidence={"reason": ("undersized" if checked
+                                         else "not a usable image"),
+                              "px": checked[2] if checked else None}))
         for idx, row in enumerate(rows):
             path = ctx.root / row["path"]
             values = {"date": match.date, "albumartist": match.albumartist,
@@ -205,39 +223,19 @@ def run(ctx: Context) -> None:
                                           action="propose", field="release",
                                           new=match.id, evidence=match.evidence))
                 continue
-            ok, changed = guarded_write(ctx, "mb", row["path"], probe.write,
-                                        path, values, overwrite=ctx.overwrite)
+            # Fields and art in one save. probe.write's own read decides
+            # whether this file still needs art, so the separate needs_art
+            # parse is gone too.
+            ok, changed = guarded_write(
+                ctx, "mb", row["path"], probe.write, path, values,
+                overwrite=ctx.overwrite,
+                art=(usable[0], usable[1]) if usable else None,
+                art_min_px=ctx.cfg.art_min_px)
             if not ok:
                 continue
             for f, old, new in changed:
                 ctx.journal.record_write("mb", ctx.root, path, f, old, new,
                                          evidence=match.evidence)
-            if art and needs_art(path, ctx.cfg.art_min_px):
-                # Same validation local sidecar art gets: decoded, format
-                # checked, re-encoded if it is not already JPEG or PNG.
-                # min_px=0 so an image that decodes but is too small stays
-                # distinguishable from one that is not an image at all.
-                checked = probe.validate_art(art, 0)
-                if checked and checked[2] >= ctx.cfg.art_min_px:
-                    data, mime, px = checked
-                    ok, _ = guarded_write(ctx, "mb", row["path"],
-                                          probe.embed_art, path, data, mime)
-                    if ok:
-                        ctx.journal.record_write("mb", ctx.root, path, "art",
-                                                 None, f"{px}px",
-                                                 evidence=match.evidence)
-                else:
-                    # Found live: a source had real art for this release
-                    # but under the size floor — the decline is correct,
-                    # but silence here looked identical to "no art fetch
-                    # attempted" from the outside.
-                    ctx.journal.append(Record(
-                        stage="mb", path=row["path"], action="reject",
-                        field="art",
-                        evidence={
-                            "reason": ("undersized" if checked
-                                       else "not a usable image"),
-                            "px": checked[2] if checked else None}))
         handled += 1
     ctx.say(f"mb: {handled} folders handled "
             f"({'applied' if ctx.apply else 'dry run'})")
