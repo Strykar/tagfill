@@ -7,6 +7,7 @@
     tagfill run --convert-wav --apply   the same, writing (+ WAV->FLAC)
     tagfill <stage> [--apply]           one stage
     tagfill filename --from-review report/review-queue.csv --apply
+    tagfill compact                     shrink journal.jsonl
     tagfill restore                     undo from backup/tags.jsonl
 
 Dry run is the default everywhere. `--apply` is the only thing that writes.

@@ -197,6 +197,7 @@ def run(ctx: Context) -> None:
         # waste. min_px=0 so an image that decodes but is too small stays
         # distinguishable from one that is not an image at all.
         checked = probe.validate_art(art, 0) if art else None
+        no_pillow = art is not None and not probe.pillow_available()
         usable = checked if checked and checked[2] >= ctx.cfg.art_min_px \
             else None
         if art and not usable:
@@ -207,9 +208,11 @@ def run(ctx: Context) -> None:
                 ctx.journal.append(Record(
                     stage="mb", path=row["path"], action="reject",
                     field="art",
-                    evidence={"reason": ("undersized" if checked
-                                         else "not a usable image"),
-                              "px": checked[2] if checked else None}))
+                    evidence={"reason": (
+                        "pillow not installed, so no image can be checked"
+                        if no_pillow else
+                        "undersized" if checked else "not a usable image"),
+                        "px": checked[2] if checked else None}))
         for idx, row in enumerate(rows):
             path = ctx.root / row["path"]
             values = {"date": match.date, "albumartist": match.albumartist,

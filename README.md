@@ -95,6 +95,7 @@ tagfill only ever edits the metadata inside your audio files — the tags a musi
 | Move a file | Never |
 | Delete a file | Never — originals from a conversion go to a quarantine folder, not the trash |
 | Reorganize your folders | Never |
+| Follow a symlink | Never — a link is skipped and listed, because writing to one would replace the link with a regular file |
 
 **Known limitations:** beyond the one-folder-per-release expectation above, a folder holding several albums at once is read as a single compilation and will usually just fail to match rather than being split apart; tracks nobody has catalogued stay unresolved rather than being guessed at; and zero-byte or unreadable files are listed for re-download, since there's nothing in them to repair.
 

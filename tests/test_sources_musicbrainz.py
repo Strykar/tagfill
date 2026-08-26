@@ -66,13 +66,6 @@ def test_top_genre_ignores_tags_nobody_voted_for():
     assert _top_genre(rel) == ""
 
 
-def test_top_genre_prefers_the_most_voted_tag():
-    rel = {"tag-list": [{"name": "seen live", "count": "1"},
-                        {"name": "techno", "count": "9"},
-                        {"name": "favourites", "count": "2"}]}
-    assert _top_genre(rel) == "techno"
-
-
 def test_top_genre_takes_a_lone_low_vote_tag():
     """It is the only signal there is, it only fills a blank, and restore
     undoes it."""

@@ -24,7 +24,7 @@ from pathlib import Path
 
 from .. import probe
 from ..journal import Record
-from . import Context, guarded_write
+from . import Context, StagePrecondition, guarded_write
 
 
 def _load_image(data: bytes, min_px: int) -> tuple[bytes, str, int] | None:
@@ -68,6 +68,10 @@ def needs_art(path, art_min_px: int) -> bool:
 
 
 def run(ctx: Context) -> None:
+    if not probe.pillow_available():
+        raise StagePrecondition(
+            "needs pillow to decide whether an image is usable "
+            "(pip install 'tagfill[network]', or just pillow)")
     from . import census
     rows = [r for r in census.load(ctx) if not r["issue"]]
     min_px = ctx.cfg.art_min_px

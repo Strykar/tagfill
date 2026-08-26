@@ -7,7 +7,7 @@ request or takes a guess. Each stage module exposes `run(ctx) -> None`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..backup import TagBackup
@@ -59,7 +59,6 @@ class Context:
     backup: TagBackup | None = None
     recheck: bool = False       # ignore the resume guard
     from_review: Path | None = None
-    extras: dict = field(default_factory=dict)
 
     @property
     def root(self) -> Path:

@@ -32,11 +32,27 @@ def _ctx(tmp_path, monkeypatch):
     return ctx, ran
 
 
-def test_the_cli_no_longer_owns_the_order():
-    cli = (Path(__file__).resolve().parents[1] / "tagfill" / "cli.py"
-           ).read_text(encoding="utf-8")
-    assert "pipeline.run(" in cli
-    assert "for num, name, module, network in STAGES" not in cli
+def test_the_cli_runs_the_pipeline_rather_than_its_own_loop(tmp_path,
+                                                            monkeypatch):
+    """Behavioural rather than a grep for "pipeline.run(" in cli.py: what
+    matters is that `tagfill run` goes through the same function an
+    embedder calls, so the two cannot drift."""
+    from tagfill import cli
+    music = tmp_path / "Music"
+    music.mkdir()
+    ran = []
+    monkeypatch.setattr(pipeline, "stage_module",
+                        lambda m: type("M", (), {
+                            "run": staticmethod(lambda _c: ran.append(m))})())
+
+    rc = cli.main(["--music-dir", str(music), "--workdir",
+                   str(tmp_path / "work"), "run", "--offline"])
+
+    assert rc == 0
+    assert ran, "the CLI ran no stages through pipeline.stage_module"
+    assert "submit" not in ran and "convert" not in ran
+    assert ran == [m for num, _n, m, net in STAGES
+                   if num not in (1, 9) and not net]
 
 
 def test_submit_never_runs_unattended(tmp_path, monkeypatch):

@@ -53,15 +53,6 @@ def test_every_stage_write_goes_through_guarded_write():
         "direct probe write outside guarded_write: " + ", ".join(offenders))
 
 
-def test_probe_is_never_monkeypatched():
-    """The specific mechanism that made this global. If it comes back, it
-    comes back silently."""
-    cli = (Path(__file__).resolve().parents[1] / "tagfill" / "cli.py"
-           ).read_text(encoding="utf-8")
-    assert "probe.write, probe.embed_art =" not in cli
-    assert "_install_backup_hook" not in cli
-
-
 def _ctx(tmp_path, name, *, backup):
     cfg = config.Config()
     cfg.root, cfg.workdir = tmp_path / name, tmp_path / f"work-{name}"

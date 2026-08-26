@@ -101,7 +101,6 @@ def test_two_different_songs_in_one_folder_get_independent_queries(
     ])
     monkeypatch.setattr(itunes.probe, "read_art", lambda p: None)
     monkeypatch.setattr(itunes.probe, "image_min_px", lambda d: 500)
-    monkeypatch.setattr(itunes.probe, "sniff_mime", lambda d: "image/jpeg")
     monkeypatch.setattr(itunes.probe, "embed_art", lambda p, d, m: None)
 
     with requests_mock.Mocker() as m:
@@ -133,7 +132,6 @@ def test_a_real_album_folder_still_groups_its_tracks_together(
     embedded = []
     monkeypatch.setattr(itunes.probe, "read_art", lambda p: None)
     monkeypatch.setattr(itunes.probe, "image_min_px", lambda d: 500)
-    monkeypatch.setattr(itunes.probe, "sniff_mime", lambda d: "image/jpeg")
     monkeypatch.setattr(itunes.probe, "embed_art",
                         lambda p, d, m: embedded.append(str(p)))
 

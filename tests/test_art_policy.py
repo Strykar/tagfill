@@ -14,6 +14,8 @@ direction.
 import re
 from pathlib import Path
 
+import pytest
+
 STAGES = Path(__file__).resolve().parents[1] / "tagfill" / "stages"
 
 ROW_NO_ART = {"path": "a.mp3", "issue": "", "has_art": "", "art_min_px": "",
@@ -82,3 +84,30 @@ def test_polluted_title_is_queued_not_silently_skipped():
     src = (STAGES / "filename.py").read_text(encoding="utf-8")
     assert "polluted_title" in src
     assert "startswith" in src
+
+
+def test_art_local_refuses_loudly_when_pillow_is_missing(tmp_path,
+                                                          monkeypatch):
+    """Found by the pre-release audit: every image decision routes through
+    Pillow, and without it validate_art calls a perfectly good 1000px JPEG
+    unusable. So art-local embedded nothing, silently, and reported every
+    cover as bad -- on an offline-only install, which is exactly the one
+    that does not get Pillow, since it rides in the `network` extra."""
+    from tagfill import config, probe
+    from tagfill.journal import Journal, ReviewQueue
+    from tagfill.stages import Context, StagePrecondition, art_local
+
+    monkeypatch.setattr(probe, "pillow_available", lambda: False)
+    cfg = config.Config()
+    cfg.root, cfg.workdir = tmp_path / "Music", tmp_path / "work"
+    cfg.root.mkdir(parents=True)
+    ctx = Context(cfg=cfg, journal=Journal(cfg.workdir),
+                  review=ReviewQueue(cfg.workdir))
+
+    with pytest.raises(StagePrecondition, match="pillow"):
+        art_local.run(ctx)
+
+
+def test_pillow_available_reports_the_truth():
+    from tagfill import probe
+    assert probe.pillow_available() is True      # the test env has it

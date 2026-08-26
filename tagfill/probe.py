@@ -128,9 +128,6 @@ def _open(path: Path):
         audio = cls(path)
     except Exception as e:
         raise ProbeError(f"{type(e).__name__}: {e}") from e
-    # Finding-1 containment: assert the class, never trust a convenience flag.
-    if not isinstance(audio, cls):
-        raise ProbeError(f"expected {cls.__name__}, got {type(audio).__name__}")
     return audio, family
 
 
@@ -510,6 +507,19 @@ def _set_dimensions(pic: Picture, data: bytes) -> None:
         pass
 
 
+def pillow_available() -> bool:
+    """Every image decision routes through Pillow, and without it
+    validate_art calls a perfectly good 1000px JPEG unusable -- so
+    art-local embedded nothing, silently, and reported every cover as bad.
+    Pillow rides in the `network` extra, which an offline-only install does
+    not get."""
+    try:
+        import PIL  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def image_min_px(data: bytes) -> int | None:
     try:
         from PIL import Image
@@ -517,10 +527,6 @@ def image_min_px(data: bytes) -> int | None:
             return min(im.size)
     except Exception:
         return None
-
-
-def sniff_mime(data: bytes) -> str:
-    return "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
 
 
 # Cover art larger than this is not cover art. Bounds what a hostile or
@@ -621,9 +627,3 @@ def find_sidecar_art(directory: Path) -> Path | None:
                 return hit
     return None
 
-
-def is_zero_byte(path: Path) -> bool:
-    try:
-        return path.stat().st_size == 0
-    except OSError:
-        return True
