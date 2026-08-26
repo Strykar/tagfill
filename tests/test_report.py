@@ -41,7 +41,7 @@ def test_format_text_renders_unresolved_table():
         unresolved=[{"path": "a.mp3", "missing": "art",
                      "tried": "mb: no candidate passed the duration-vector gate"}],
         reacquire=[], stubs=[], review_queue_path=None)
-    assert "tagfill report -- /music" in text
+    assert f"tagfill report -- {Path('/music')}" in text
     assert "3 files tracked" in text
     assert "mb           apply=1, reject=2" in text
     assert "Unresolved: 1 file(s)" in text
