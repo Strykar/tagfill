@@ -169,6 +169,8 @@ extra_tags = ["genre", "tracknumber"]
 
 ### Linux
 
+Needs Python 3.11 or newer.
+
 ```text
 git clone https://github.com/Strykar/tagfill
 cd tagfill
@@ -184,7 +186,7 @@ That installs the `tagfill` command plus its Python libraries:
 | [mutagen](https://pypi.org/project/mutagen/) | reading and writing tags |
 | [requests](https://pypi.org/project/requests/) | talking to the APIs |
 | [musicbrainzngs](https://pypi.org/project/musicbrainzngs/) | the MusicBrainz client |
-| [pillow](https://pypi.org/project/pillow/) | checking cover art dimensions |
+| [pillow](https://pypi.org/project/pillow/) | decoding cover art, to check it is a real image of a usable size |
 
 You will also need these tools, available via package managers like `apt` and `pacman`:
 
@@ -196,11 +198,11 @@ You will also need these tools, available via package managers like `apt` and `p
 
 ### Windows
 
+**Download [tagfill.exe](https://github.com/Strykar/tagfill/releases/latest).** No Python needed — the libraries above are bundled inside it. Put it in a folder of its own, say `C:\tagfill`. It isn't code-signed, so SmartScreen will warn the first time; every release ships a `SHA256SUMS` beside the exe if you want to check it.
+
 Two Windows notes before a big run. Real-time antivirus scans every temp file tagfill writes, so an apply over a large collection effectively re-scans it; an exclusion for the collection or the workdir makes a large difference. And a tag write does not carry NTFS permissions or alternate data streams across, so a downloaded file loses its mark-of-the-web. [SECURITY.md](SECURITY.md) has the details.
 
 Windows caps paths at 260 characters unless [long paths are enabled](https://learn.microsoft.com/windows/win32/fileio/maximum-file-path-limitation). tagfill writes a temp file beside each track while tagging it, which is a little longer than the track's own name, so a collection already close to that limit can fail on the write and not on the scan. The downloaded exe asks Windows for long-path support, so enabling it once fixes this for good.
-
-**Download [tagfill.exe](https://github.com/Strykar/tagfill/releases/latest).** No Python needed — the libraries above are bundled inside it. Put it in a folder of its own, say `C:\tagfill`.
 
 Or, if you already have Python and Git:
 
@@ -285,4 +287,4 @@ tagfill restore                              # every touched file back
 tagfill restore --only 'Path/To/One File.mp3'
 ```
 
-Everything tagfill produces — journal, census, reports, HTTP caches, backups, quarantined originals — lives in one workdir, never scattered through your collection. By default that's your per-user state directory (`~/.local/state/tagfill` on Linux, `%LOCALAPPDATA%\tagfill` on Windows); set `[collection].workdir` to put it anywhere else.
+Everything tagfill produces — journal, census, reports, HTTP caches, backups, quarantined originals — lives in one workdir, never scattered through your collection. By default that's your per-user state directory (`~/.local/state/tagfill` on Linux, `~/Library/Application Support/tagfill` on macOS, `%LOCALAPPDATA%\tagfill` on Windows); set `[collection].workdir` to put it anywhere else.
