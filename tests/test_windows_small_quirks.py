@@ -19,6 +19,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tagfill import config
@@ -92,6 +94,8 @@ def test_no_appdata_means_just_the_dotfile(monkeypatch):
     assert all(".config" in str(p) for p in config._config_locations())
 
 
+@pytest.mark.skipif(sys.platform == "win32",
+                    reason="a backslash cannot be in a Windows filename")
 def test_restore_only_leaves_a_posix_backslash_name_alone(tmp_path,
                                                           monkeypatch):
     """A file genuinely called "AC\\DC - Track.mp3" on Linux must still be

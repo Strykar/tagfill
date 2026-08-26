@@ -41,7 +41,12 @@ def test_which_then_finds_a_neighbouring_tool(tmp_path, monkeypatch):
 
     assert shutil.which("ffmpeg") is None
     _add_own_directory_to_path()
-    assert shutil.which("ffmpeg") == str(tool)
+    found = shutil.which("ffmpeg")
+    # Windows resolves the extension through PATHEXT and hands it back in
+    # that entry's casing, so which() returns "ffmpeg.EXE" for a file
+    # created as "ffmpeg.exe".
+    assert found is not None
+    assert found.casefold() == str(tool).casefold()
 
 
 def test_running_from_source_leaves_path_alone(monkeypatch):
