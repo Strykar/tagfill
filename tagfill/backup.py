@@ -23,6 +23,7 @@ import json
 from pathlib import Path
 
 from . import probe
+from .util import relpath
 
 
 class TagBackup:
@@ -40,7 +41,7 @@ class TagBackup:
                         continue
 
     def snapshot(self, root: Path, path: Path) -> None:
-        rel = str(path.relative_to(root))
+        rel = relpath(path, root)
         if rel in self._seen:
             return
         try:

@@ -114,8 +114,10 @@ def crate_grouping(rel_path: Path, crate_globs: list[str]) -> str | None:
     """If the file sits inside a crate folder, return the crate name for the
     grouping field.
 
-    Matched in POSIX form: on Windows `str(rel_path)` is backslash-separated
-    and a config glob like "DJ Pool/*" would never match."""
+    Matched in POSIX form so the result does not depend on the host.
+    (fnmatch would in fact cope on Windows -- it normcases both sides,
+    mapping / to a backslash -- but relying on that side effect is worse
+    than saying which form is being matched.)"""
     rel = rel_path.as_posix()
     parent = rel_path.parent.as_posix()
     for g in crate_globs:

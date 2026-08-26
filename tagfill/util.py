@@ -18,6 +18,18 @@ AUDIO_SUFFIXES = {
 }
 
 
+def relpath(path: Path, root: Path) -> str:
+    """A path relative to root, as the one string form everything stores.
+
+    census.csv, journal.jsonl and backup/tags.jsonl are cross-referenced by
+    this string -- the report looks a census path up in an index keyed on
+    journal paths. str() gives backslashes on Windows, so mixing the two
+    conventions made that lookup miss every time and the report's "why was
+    this declined" column silently read (none) for every file.
+    """
+    return path.relative_to(root).as_posix()
+
+
 def is_appledouble(path: Path) -> bool:
     """macOS AppleDouble resource-fork stubs (`._*`). They are 4096-byte
     metadata files that a raw `find` happily counts as audio."""

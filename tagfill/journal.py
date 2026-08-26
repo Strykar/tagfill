@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from .util import sha1_head
+from .util import relpath, sha1_head
 
 ACTIONS = ("propose", "apply", "reject", "skip")
 
@@ -59,7 +59,7 @@ class Journal:
                      applied: bool = True) -> None:
         """Journal one field change. On apply, snapshot the file *after* the
         write so the resume guard sees the post-write state."""
-        rec = Record(stage=stage, path=str(path.relative_to(root)),
+        rec = Record(stage=stage, path=relpath(path, root),
                      action="apply" if applied else "propose",
                      field=field, old=old, new=new, evidence=evidence)
         if applied and path.exists():
@@ -87,7 +87,7 @@ class Journal:
     def already_done(self, stage: str, root: Path, path: Path) -> bool:
         """True when this stage already applied to this file and the file has
         not changed since (size + mtime + head-hash all match)."""
-        d = self._load_applied().get((stage, str(path.relative_to(root))))
+        d = self._load_applied().get((stage, relpath(path, root)))
         if not d or not path.exists():
             return False
         st = path.stat()

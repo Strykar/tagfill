@@ -211,3 +211,33 @@ if __name__ == "__main__":
         if name.startswith("test_"):
             fn()
             print(f"ok {name}")
+
+
+def test_every_stored_path_uses_one_separator_convention():
+    """census.csv, journal.jsonl and backup/tags.jsonl are cross-referenced
+    by these strings -- report.py looks a census path up in an index keyed
+    on journal paths. str(relative_to()) gives backslashes on Windows, so
+    mixing conventions made that lookup miss every time and the report's
+    "why was this declined" column silently read (none) for every file.
+
+    Fails on any new `str(...relative_to(...))`, which is the shape that
+    reintroduces it."""
+    import re
+    from pathlib import Path as P
+    pkg = P(__file__).resolve().parents[1] / "tagfill"
+    offenders = []
+    for f in sorted(pkg.rglob("*.py")):
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            if re.search(r"str\(\s*\w+\.relative_to\(", line):
+                offenders.append(f"{f.name}:{n}")
+    assert not offenders, (
+        "store paths with util.relpath(), not str(relative_to()): "
+        + ", ".join(offenders))
+
+
+def test_relpath_is_separator_independent():
+    from pathlib import PureWindowsPath
+
+    from tagfill.util import relpath
+    root = PureWindowsPath(r"C:\Music")
+    assert relpath(root / "Album" / "01.mp3", root) == "Album/01.mp3"
