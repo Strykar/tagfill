@@ -85,11 +85,19 @@ def test_mb_logs_undersized_caa_art_not_silence(tmp_path, monkeypatch):
 
     root = tmp_path / "music"
     (root / "Some Album").mkdir(parents=True)
+    # Two tracks, not one: gate() refuses a single duration as evidence,
+    # and this test is about the art decline being journalled rather than
+    # about how few files it takes to get there.
     _real_mp3(root / "Some Album" / "01 Track.mp3", seconds=1)
+    _real_mp3(root / "Some Album" / "02 Track.mp3", seconds=1)
     ctx = _ctx(tmp_path, root, mb_contact="test@example.org")
-    _write_census(ctx, [{"path": "Some Album/01 Track.mp3", "container": "mp3",
-                        "size": 1, "mtime": "0", "artist": "Some Artist",
-                        "album": "Some Album", "duration": "200"}])
+    _write_census(ctx, [
+        {"path": "Some Album/01 Track.mp3", "container": "mp3", "size": 1,
+         "mtime": "0", "artist": "Some Artist", "album": "Some Album",
+         "duration": "200"},
+        {"path": "Some Album/02 Track.mp3", "container": "mp3", "size": 1,
+         "mtime": "0", "artist": "Some Artist", "album": "Some Album",
+         "duration": "210"}])
 
     class FakeMB:
         @staticmethod
@@ -105,7 +113,8 @@ def test_mb_logs_undersized_caa_art_not_silence(tmp_path, monkeypatch):
             return {"release": {
                 "id": rid, "title": "Some Album",
                 "medium-list": [{"track-list": [
-                    {"recording": {"length": 200000}}]}],
+                    {"recording": {"length": 200000}},
+                    {"recording": {"length": 210000}}]}],
             }}
 
     monkeypatch.setitem(sys.modules, "musicbrainzngs", FakeMB())

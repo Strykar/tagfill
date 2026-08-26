@@ -16,7 +16,7 @@ It doesn't do the matching itself. It asks these four, through their own officia
 **Try it, risk-free:** `tagfill --music-dir /path/to/music --report` prints a read-only report on the state of your library.
 
 ```text
-tagfill report -- /home/you/Music
+tagfill report for /home/you/Music
 ================================================================================
 6 files tracked
 
@@ -129,7 +129,7 @@ flowchart LR
 | `--report` | what's still missing, and which sources declined it |
 | `submit` | opt-in: contribute what you found back upstream |
 
-So `tagfill art-local --apply` embeds cover art from your disk and does nothing else. Two flags help while you're trying things out: `--path 'Some/Subtree'` limits a run to one folder inside your library (keep the quotes if the name has spaces), and `--limit 50` stops after 50 files so you can see what happens before letting it loose on everything.
+So `tagfill art-local --apply` embeds cover art from your disk and does nothing else. Two flags help while you're trying things out: `--path 'Some/Subtree'` limits a run to one folder inside your library (keep the quotes if the name has spaces), and `--limit 50` stops after 50 targets so you can see what happens before letting it loose on everything. A target is a file for most stages, and a folder for the ones that work an album at a time (`mb`, `itunes`), since an album is only worth looking up once.
 
 ## How a missing tag or cover gets found
 
