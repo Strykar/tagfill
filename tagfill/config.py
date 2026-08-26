@@ -88,7 +88,11 @@ globs = []                  # e.g. ["DJ Pool/*"]
 
 @dataclass
 class Config:
-    root: Path = Path(".")
+    # No default. cwd is always a directory, so defaulting to it meant
+    # `tagfill run --apply` in the wrong terminal walked whatever you were
+    # standing in -- and even a read-only census overwrote the shared
+    # workdir's baseline for your real collection.
+    root: Path | None = None
     workdir: Path = field(default_factory=default_workdir)
     exclude: list[str] = field(default_factory=list)
     extra_tags: list[str] = field(

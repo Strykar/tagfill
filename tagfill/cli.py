@@ -116,9 +116,12 @@ def main(argv: list[str] | None = None) -> int:
         cfg.root = args.music_dir.resolve()
     if args.workdir:
         cfg.workdir = args.workdir.resolve()
+    if cfg.root is None:
+        print("no collection root: pass --music-dir, or set "
+              "[collection].root in tagfill.toml")
+        return 1
     if not cfg.root.is_dir():
-        print(f"collection root {cfg.root} is not a directory "
-              f"(set it in tagfill.toml or pass --music-dir)")
+        print(f"collection root {cfg.root} is not a directory")
         return 1
 
     if args.report:
