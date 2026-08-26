@@ -66,7 +66,12 @@ def _http_cached(url: str, cache_dir: Path, limiter: RateLimiter,
     except Exception:
         return None
     if r.status_code != 200:
-        key.write_bytes(b"")
+        # Cache "definitely not there", never "not there right now". A 429
+        # or a 503 written as an empty file is a transient outage promoted
+        # to a permanent miss, with nothing to distinguish it from a real
+        # 404 on the next run.
+        if r.status_code in (404, 410):
+            key.write_bytes(b"")
         return None
     key.write_bytes(r.content)
     return r.content
@@ -78,13 +83,21 @@ def _top_genre(release: dict) -> str:
     rejected as an invalid include) -- the release-group's tags are the
     less noisy of the two (a release's own tags are sparser and more
     likely a single one-off vote), so prefer those. Highest vote count
-    wins; a tag with a count of 1 among twenty is not a genre, it's someone
-    being cute."""
+    wins, so a tag with a count of 1 among twenty loses to the real genre.
+    A tag nobody voted for wins nothing: the API returns count 0 entries,
+    and picking arbitrarily out of a pool with no votes in it is a guess
+    dressed as evidence. A lone count-1 tag is still taken -- it is the
+    only signal there is, it only ever fills a blank, and `restore` undoes
+    it."""
     tags = (release.get("release-group", {}).get("tag-list")
            or release.get("tag-list") or [])
-    if not tags:
+    voted = [(int(t.get("count") or 0), t.get("name") or "") for t in tags]
+    voted = [t for t in voted if t[0] > 0 and t[1]]
+    if not voted:
         return ""
-    return max(tags, key=lambda t: int(t.get("count", 0))).get("name", "")
+    # Tuple max, so a tie is broken by name and not by whatever order the
+    # API happened to return.
+    return max(voted)[1]
 
 
 def _duration_vectors(release: dict) -> list[list[float]]:

@@ -56,3 +56,39 @@ def test_get_release_by_id_requests_artist_credits():
         "compilation folder's albumartist silently falls back to the "
         "literal string 'Various Artists', discarding MusicBrainz's real "
         "credited names")
+
+
+def test_top_genre_ignores_tags_nobody_voted_for():
+    """External review: the docstring promised vote-weighting the code did
+    not do. A count-0 pool used to hand back whichever tag came first."""
+    rel = {"tag-list": [{"name": "seen live", "count": "0"},
+                        {"name": "awesome", "count": "0"}]}
+    assert _top_genre(rel) == ""
+
+
+def test_top_genre_prefers_the_most_voted_tag():
+    rel = {"tag-list": [{"name": "seen live", "count": "1"},
+                        {"name": "techno", "count": "9"},
+                        {"name": "favourites", "count": "2"}]}
+    assert _top_genre(rel) == "techno"
+
+
+def test_top_genre_takes_a_lone_low_vote_tag():
+    """It is the only signal there is, it only fills a blank, and restore
+    undoes it."""
+    rel = {"tag-list": [{"name": "dub", "count": "1"}]}
+    assert _top_genre(rel) == "dub"
+
+
+def test_top_genre_breaks_a_tie_the_same_way_every_run():
+    a = {"tag-list": [{"name": "techno", "count": "3"},
+                      {"name": "house", "count": "3"}]}
+    b = {"tag-list": [{"name": "house", "count": "3"},
+                      {"name": "techno", "count": "3"}]}
+    assert _top_genre(a) == _top_genre(b)
+
+
+def test_top_genre_prefers_release_group_tags_over_the_releases_own():
+    rel = {"release-group": {"tag-list": [{"name": "techno", "count": "5"}]},
+           "tag-list": [{"name": "noise", "count": "99"}]}
+    assert _top_genre(rel) == "techno"
