@@ -30,20 +30,38 @@ def _tone(dest: Path, codec_args: list[str], freq: int = 440) -> None:
         check=True)
 
 
-def _vorbis_args() -> list[str]:
+def _encoders() -> str:
+    return subprocess.run(["ffmpeg", "-v", "error", "-encoders"],
+                          capture_output=True, text=True, check=True).stdout
+
+
+def vorbis_args() -> list[str]:
     """Homebrew's ffmpeg ships without libvorbis, so the macOS CI job could
-    not build the ogg fixture at all. ffmpeg's own vorbis encoder is there
-    instead; it is marked experimental and refuses anything but stereo,
-    which is why -ac 2 and -strict -2 come with it. Either way the file is
-    a two-second sine tone."""
-    encoders = subprocess.run(["ffmpeg", "-v", "error", "-encoders"],
-                              capture_output=True, text=True, check=True).stdout
+    not build an ogg at all. ffmpeg's own vorbis encoder is there instead;
+    it is marked experimental and refuses anything but stereo, which is why
+    -ac 2 and -strict -2 come with it. Either way the file is a sine tone.
+
+    Shared with test_probe_roundtrip so one ffmpeg build cannot satisfy the
+    fixture tree and fail the container matrix."""
+    encoders = _encoders()
     if "libvorbis" in encoders:
         return ["-c:a", "libvorbis"]
     if " vorbis " in encoders:
         return ["-ac", "2", "-c:a", "vorbis", "-strict", "-2"]
     raise SystemExit("this ffmpeg has no vorbis encoder, libvorbis or "
-                     "otherwise, so the ogg fixture cannot be built")
+                     "otherwise, so no ogg fixture can be built")
+
+
+def opus_args() -> list[str]:
+    """Same story one container over. Opus is 48kHz-only, so the native
+    encoder needs the rate spelled out."""
+    encoders = _encoders()
+    if "libopus" in encoders:
+        return ["-c:a", "libopus"]
+    if " opus " in encoders:
+        return ["-ar", "48000", "-c:a", "opus", "-strict", "-2"]
+    raise SystemExit("this ffmpeg has no opus encoder, libopus or "
+                     "otherwise, so no opus fixture can be built")
 
 
 def _art_bytes(px: int = 600) -> bytes:
@@ -111,7 +129,7 @@ def build(root: Path) -> None:
 
     # Art-missing ogg, tagged
     p = root / "Singles" / "Ogg Artist - No Art.ogg"
-    _tone(p, _vorbis_args(), 600)
+    _tone(p, vorbis_args(), 600)
     audio = OggVorbis(p)
     audio["artist"], audio["title"] = ["Ogg Artist"], ["No Art"]
     audio.save()

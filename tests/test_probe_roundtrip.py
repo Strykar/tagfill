@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
+from make_fixtures import opus_args, vorbis_args
 
 from tagfill import probe
 
@@ -31,11 +32,12 @@ needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None,
                                   reason="needs ffmpeg")
 
 
-def _ffmpeg(codec):
+def _ffmpeg(*codec_args):
     def build(path):
+        args = list(codec_args[0]() if callable(codec_args[0]) else codec_args)
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
                         "-i", "sine=frequency=440:duration=1",
-                        "-c:a", codec, str(path)], check=True)
+                        *args, str(path)], check=True)
     return build
 
 
@@ -71,11 +73,13 @@ def _build_dff(path, channels=2, rate=2822400, frames=4096):
 
 # suffix -> how to produce one
 _BUILDERS = {
-    ".mp3": _ffmpeg("libmp3lame"), ".flac": _ffmpeg("flac"),
-    ".ogg": _ffmpeg("libvorbis"), ".opus": _ffmpeg("libopus"),
-    ".m4a": _ffmpeg("aac"), ".mp4": _ffmpeg("aac"),
-    ".aiff": _ffmpeg("pcm_s16be"), ".aif": _ffmpeg("pcm_s16be"),
-    ".aifc": _ffmpeg("pcm_s16be"), ".wav": _ffmpeg("pcm_s16le"),
+    ".mp3": _ffmpeg("-c:a", "libmp3lame"), ".flac": _ffmpeg("-c:a", "flac"),
+    # Which vorbis and opus encoder exists depends on the ffmpeg build; see
+    # make_fixtures for why.
+    ".ogg": _ffmpeg(vorbis_args), ".opus": _ffmpeg(opus_args),
+    ".m4a": _ffmpeg("-c:a", "aac"), ".mp4": _ffmpeg("-c:a", "aac"),
+    ".aiff": _ffmpeg("-c:a", "pcm_s16be"), ".aif": _ffmpeg("-c:a", "pcm_s16be"),
+    ".aifc": _ffmpeg("-c:a", "pcm_s16be"), ".wav": _ffmpeg("-c:a", "pcm_s16le"),
     ".dsf": _build_dsf, ".dff": _build_dff,
 }
 
