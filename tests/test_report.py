@@ -41,7 +41,7 @@ def test_format_text_renders_unresolved_table():
         unresolved=[{"path": "a.mp3", "missing": "art",
                      "tried": "mb: no candidate passed the duration-vector gate"}],
         reacquire=[], stubs=[], review_queue_path=None)
-    assert f"tagfill report -- {Path('/music')}" in text
+    assert f"tagfill report for {Path('/music')}" in text
     assert "3 files tracked" in text
     assert "mb           apply=1, reject=2" in text
     assert "Unresolved: 1 file(s)" in text
@@ -177,8 +177,11 @@ def test_repeated_journal_entries_across_runs_are_deduped(tmp_path):
     ctx = _ctx(tmp_path, root)
 
     # Three sessions' worth of the identical reject, as append-only
-    # journal.jsonl would actually accumulate it.
-    line = ('{"stage": "mb", "path": "Some Album/01 Track.mp3", '
+    # journal.jsonl would actually accumulate it. The path is the folder,
+    # which is the only shape mb.py ever emits -- this test used to write a
+    # per-file path, so it passed while exercising a record production does
+    # not produce, and missed the report-side lookup bug entirely.
+    line = ('{"stage": "mb", "path": "Some Album", '
            '"action": "reject", "field": "release", '
            '"evidence": {"reason": "no candidate passed the gate"}, '
            '"ts": "2026-08-2%d"}\n')

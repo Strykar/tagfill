@@ -146,7 +146,10 @@ def format_text(root, total_files: int,
     """Render the report as plain text: a summary a person can read in a
     terminal or a redirected file, not just the CSVs a spreadsheet reads."""
     out = []
-    out.append(f"tagfill report -- {root}")
+    # "for", not "--": the header sits at the top of a block people
+    # copy out of the README, and `tagfill report` is not a command
+    # (the report is a top-level flag).
+    out.append(f"tagfill report for {root}")
     out.append("=" * 80)
     out.append(f"{total_files} files tracked")
     out.append("")
