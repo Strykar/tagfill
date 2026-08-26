@@ -6,6 +6,12 @@ on:
   pull_request:
   workflow_dispatch: {}
 
+# Nothing here writes anything back. Stated in the file rather than left to
+# the repository's default-token setting, which is a checkbox someone can
+# flip to "read and write" in Settings without touching this workflow.
+permissions:
+  contents: read
+
 jobs:
   test:
     # pyproject says >=3.11, so 3.11 has to be tested or the floor is a

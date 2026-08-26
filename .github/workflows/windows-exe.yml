@@ -16,8 +16,12 @@ on:
     tags: ["v*"]
   workflow_dispatch: {}
 
+# Read by default; only the job that publishes a release gets write, so
+# the test job -- which installs packages from PyPI and runs the whole
+# suite -- cannot write to the repository even if something in there wanted
+# to.
 permissions:
-  contents: write # needed for `gh release`
+  contents: read
 
 # Actions are pinned by commit SHA, not by tag. A tag is mutable, and this
 # workflow has contents: write and produces the binary people download.
@@ -29,6 +33,8 @@ jobs:
   # while passing on Linux -- so the suite has to actually run here.
   tests:
     runs-on: windows-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -46,6 +52,8 @@ jobs:
   build:
     needs: tests
     runs-on: windows-latest
+    permissions:
+      contents: write # `gh release create` attaches the exe and SHA256SUMS
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
