@@ -77,6 +77,12 @@ def gate(local: list[float], vectors: list[list[float]],
     pass_fraction. See musicbrainz.py for why the unordered tier exists
     and why it uses the same threshold as the positional tier rather than
     a stricter one."""
+    # A single duration is not evidence: any catalogued one-track release
+    # within tolerance passes, and plenty of songs are 3:30. A lone file
+    # whose album is genuinely unknown belongs to acoustid, which
+    # identifies by the audio itself. Empty beats wrong.
+    if len(local) < 2:
+        return None
     for i, v in enumerate(vectors):
         if len(v) != len(local):
             continue

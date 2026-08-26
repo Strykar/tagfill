@@ -93,3 +93,18 @@ def test_unordered_match_is_a_true_bijection_not_reusing_candidates():
     candidate = [100.05]  # only one candidate duration
     matched = _unordered_match(local, candidate, tolerance=1.0)
     assert matched == 1, "one candidate duration can only match once"
+
+
+def test_a_single_duration_is_not_evidence():
+    """External review: a lone fully-tagged single sitting in its own
+    folder, missing only art, sails into mb where any catalogued one-track
+    release within tolerance passes. Plenty of songs are 3:30. That folder
+    belongs to acoustid, which identifies by the audio itself."""
+    assert gate([210.0], [[210.0]], tolerance=4.0, pass_fraction=0.90) is None
+    assert gate([210.0], [[212.5]], tolerance=4.0, pass_fraction=0.90) is None
+    # Two is enough to be a vector rather than a coincidence.
+    assert gate([210.0, 185.0], [[210.0, 185.0]], 4.0, 0.90) is not None
+
+
+def test_gate_on_an_empty_vector_does_not_divide_by_zero():
+    assert gate([], [[]], tolerance=4.0, pass_fraction=0.90) is None
