@@ -144,3 +144,16 @@ def test_a_write_preserves_extended_attributes(tmp_path):
 
     probe.write(p, {"artist": "Someone"})
     assert os.getxattr(p, "user.tagfill_test") == b"keepme"
+
+
+@needs_ffmpeg
+def test_a_write_works_where_os_chown_does_not_exist(tmp_path, monkeypatch):
+    """Windows has no os.chown, and AttributeError is not an OSError, so
+    suppressing only PermissionError/OSError made every write there raise.
+    CI caught it; this reproduces it on Linux by hiding the attribute."""
+    import os
+    monkeypatch.delattr(os, "chown", raising=False)
+    p = tmp_path / "t.mp3"
+    _mp3(p)
+    probe.write(p, {"artist": "Someone"})       # must not raise
+    assert probe.read(p).get("artist") == "Someone"

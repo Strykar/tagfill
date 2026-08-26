@@ -206,8 +206,12 @@ def _atomic_save(path: Path, mutate) -> None:
     try:
         st = path.stat()
         shutil.copy2(path, tmp)          # mode, mtime and xattrs; not owner
-        with contextlib.suppress(PermissionError, OSError):
-            os.chown(tmp, st.st_uid, st.st_gid)   # no-op unless privileged
+        # POSIX-only; Windows has no os.chown at all, and AttributeError
+        # is not an OSError, so guarding on the exception alone made every
+        # write on Windows raise.
+        if hasattr(os, "chown"):
+            with contextlib.suppress(PermissionError, OSError):
+                os.chown(tmp, st.st_uid, st.st_gid)  # no-op unless privileged
         audio, family = _open(tmp)
         mutate(audio, family)
         audio.save()
