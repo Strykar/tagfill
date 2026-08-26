@@ -213,8 +213,16 @@ def _atomic_save(path: Path, mutate) -> None:
             with contextlib.suppress(PermissionError, OSError):
                 os.chown(tmp, st.st_uid, st.st_gid)  # no-op unless privileged
         audio, family = _open(tmp)
+        # mutagen's save() writes ID3v2.4 whatever it read, so filling one
+        # blank genre silently upgraded every v2.3 tag in the collection --
+        # and v2.3 is the version Windows Explorer and older hardware
+        # players read reliably. Keep whatever the file already had.
+        kwargs = {}
+        if family == "id3" and getattr(
+                getattr(audio, "tags", None), "version", (2, 4))[1] == 3:
+            kwargs["v2_version"] = 3
         mutate(audio, family)
-        audio.save()
+        audio.save(**kwargs)
         # "r+b", not "rb": fsync on Windows is _commit(), which needs a
         # writable handle. A read-only one raises before os.replace, so
         # every write would fail there while passing on Linux.
