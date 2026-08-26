@@ -8,14 +8,28 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # pyproject says >=3.11, so 3.11 has to be tested or the floor is a
+    # guess. macOS is here for the same reason the Windows job exists: the
+    # os.chown crash shipped because nothing but Linux ever ran a write.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, python: "3.11"}
+          - {os: ubuntu-latest, python: "3.12", lint: true}
+          - {os: macos-latest, python: "3.12"}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg flac
+          python-version: ${{ matrix.python }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg flac
+      - if: runner.os == 'macOS'
+        run: brew install ffmpeg flac
       - run: pip install -e .[network,test] ruff
-      - run: ruff check tagfill/ tests/ packaging/
+      - if: matrix.lint
+        run: ruff check tagfill/ tests/ packaging/
       - run: python tests/make_fixtures.py
       - run: pytest tests/ -q
