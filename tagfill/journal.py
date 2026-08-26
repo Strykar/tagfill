@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import csv
 import json
-import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import ClassVar
 
@@ -54,7 +54,9 @@ class Journal:
     # keeps journals from going diff-noisy across machines.
     def append(self, rec: Record) -> None:
         assert rec.action in ACTIONS, rec.action
-        rec.ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        # Not strftime("%z"): the UCRT maps it to the timezone name, so
+        # Windows journals read "...T17:24:00India Standard Time".
+        rec.ts = datetime.now().astimezone().isoformat(timespec="seconds")
         key = (rec.stage, rec.action)
         self.counts[key] = self.counts.get(key, 0) + 1
         with open(self.path, "a", encoding="utf-8", newline="\n") as f:
@@ -91,15 +93,26 @@ class Journal:
         return self._applied
 
     def already_done(self, stage: str, root: Path, path: Path) -> bool:
-        """True when this stage already applied to this file and the file has
-        not changed since (size + mtime + head-hash all match)."""
+        """True when this stage already applied to this file and the file
+        has not changed since.
+
+        Size plus head-hash is the evidence; mtime is only a cheap way to
+        skip the hash. It used to be a gate instead, demanding equality to
+        within a microsecond, which the filesystems music actually lives on
+        cannot supply: exFAT and FAT32 store mtimes at 2-second granularity
+        and in local time, so a remount or a DST shift moved every one of
+        them, and SMB truncates precision too. The failure was conservative
+        -- files got re-examined, never wrongly written -- but a library on
+        a portable drive re-spent the whole MusicBrainz budget every run.
+        """
         d = self._load_applied().get((stage, relpath(path, root)))
         if not d or not path.exists():
             return False
         st = path.stat()
-        if (st.st_size != d.get("size")
-                or abs(st.st_mtime - (d.get("mtime") or 0)) > 1e-6):
+        if st.st_size != d.get("size"):
             return False
+        if abs(st.st_mtime - (d.get("mtime") or 0)) <= 1e-6:
+            return True
         return sha1_head(path) == d.get("sha1_head")
 
     def summary(self) -> str:

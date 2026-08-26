@@ -135,11 +135,26 @@ class Config:
         return ""
 
 
+def _config_locations() -> list[Path]:
+    """Where to look when no --config was given.
+
+    ~/.config works on Windows but is not where anyone looks for it, so
+    %APPDATA%\\tagfill\\tagfill.toml comes first there. The dotfile stays in
+    the list either way: someone syncing a home directory across both
+    should not have to keep two.
+    """
+    here = []
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        here.append(Path(appdata) / "tagfill" / "tagfill.toml")
+    here.append(Path("~/.config/tagfill.toml").expanduser())
+    return here
+
+
 def load(path: Path | None) -> Config:
     cfg = Config()
     if path is None:
-        for candidate in (Path("tagfill.toml"),
-                          Path("~/.config/tagfill.toml").expanduser()):
+        for candidate in (Path("tagfill.toml"), *_config_locations()):
             if candidate.is_file():
                 path = candidate
                 break

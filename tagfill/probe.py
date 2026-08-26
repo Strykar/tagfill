@@ -19,6 +19,8 @@ import contextlib
 import io
 import os
 import shutil
+import sys
+import time
 from dataclasses import dataclass
 from dataclasses import field as dc_field
 from pathlib import Path
@@ -165,6 +167,31 @@ def read(path: Path) -> TagState:
     return st
 
 
+def _replace_with_retry(tmp: Path, path: Path, attempts: int = 4) -> None:
+    """os.replace, with a short backoff on Windows.
+
+    Replacing a file another process has open is unremarkable on POSIX. On
+    Windows it raises a sharing violation unless that process opened the
+    destination with FILE_SHARE_DELETE, and the usual holders are exactly
+    the ones a music collection attracts: a player with the album loaded,
+    Explorer's preview pane, the search indexer, real-time antivirus
+    scanning the temp file we just wrote.
+
+    guarded_write turns the failure into a journalled skip, which is the
+    right floor, but the antivirus case is a transient race -- without a
+    retry, runs are nondeterministically lossy on the one OS where
+    real-time scanning is the default.
+    """
+    for attempt in range(attempts):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if sys.platform != "win32" or attempt == attempts - 1:
+                raise
+            time.sleep(0.1 * (attempt + 1))
+
+
 def _atomic_save(path: Path, mutate) -> None:
     """Apply `mutate(audio, family)` and save, without ever leaving the
     user's file half-written.
@@ -228,7 +255,7 @@ def _atomic_save(path: Path, mutate) -> None:
         # every write would fail there while passing on Linux.
         with open(tmp, "r+b") as fh:
             os.fsync(fh.fileno())        # durable before it becomes the file
-        os.replace(tmp, path)
+        _replace_with_retry(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise

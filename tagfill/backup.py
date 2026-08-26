@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import base64
 import json
-from pathlib import Path
+import sys
+from pathlib import Path, PureWindowsPath
 
 from . import probe
 from .util import relpath
@@ -59,6 +60,16 @@ class TagBackup:
 
 
 def restore(root: Path, backup_file: Path, only: str | None = None) -> int:
+    # Stored paths are POSIX by convention (see util.relpath); a Windows
+    # user types backslashes and would match nothing. NTFS also hands back
+    # one canonical casing while the user may well type another.
+    #
+    # Both translations are gated on the platform on purpose: a backslash
+    # is a legal character in a POSIX filename, and case matters there, so
+    # normalizing unconditionally would break matches that work today.
+    windows = sys.platform == "win32"
+    if only and windows:
+        only = PureWindowsPath(only).as_posix().casefold()
     n = 0
     with open(backup_file, encoding="utf-8") as f:
         for line in f:
@@ -66,7 +77,8 @@ def restore(root: Path, backup_file: Path, only: str | None = None) -> int:
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if only and rec["path"] != only:
+            stored = rec["path"].casefold() if windows else rec["path"]
+            if only and stored != only:
                 continue
             path = root / rec["path"]
             if not path.exists():
