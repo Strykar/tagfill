@@ -20,7 +20,7 @@ import json
 import shutil
 
 from .. import probe
-from ..util import iter_audio
+from ..util import iter_audio, relpath
 from . import Context
 
 # Spliced from probe.FIELDS rather than restated: DictWriter raises on an
@@ -41,7 +41,10 @@ def collect(ctx: Context) -> list[dict]:
     records exists.
     """
     rows = []
-    for path in iter_audio(ctx.root, ctx.cfg.exclude, ctx.workdir):
+    sidecar_cache: dict = {}
+    links: list = []
+    for path in iter_audio(ctx.root, ctx.cfg.exclude, ctx.workdir,
+                           skipped_links=links):
         st = path.stat()
         row = dict.fromkeys(COLUMNS, "")
         row.update(path=path.relative_to(ctx.root).as_posix(),
@@ -62,13 +65,27 @@ def collect(ctx: Context) -> list[dict]:
         row["duration"] = f"{tags.duration:.2f}" if tags.duration else ""
         row["bitrate"] = tags.bitrate or ""
         row["has_art"] = "1" if tags.has_art else ""
-        if tags.has_art:
-            art = probe.read_art(path)
-            if art:
-                px = probe.image_min_px(art[0])
-                row["art_min_px"] = px if px else ""
-        sidecar = probe.find_sidecar_art(path.parent)
+        row["art_min_px"] = tags.art_min_px or ""
+        if tags.art_error:
+            row["issue"] = f"unreadable art: {tags.art_error}"
+        # Per folder, not per file: a 16-track album used to list its own
+        # directory sixteen times, plus any Cover/ subdir. Free on Linux
+        # once the dentry cache is warm, and network round trips against a
+        # NAS or an SMB share, where this was the dominant census cost.
+        parent = path.parent
+        if parent not in sidecar_cache:
+            sidecar_cache[parent] = probe.find_sidecar_art(parent)
+        sidecar = sidecar_cache[parent]
         row["sidecar"] = sidecar.name if sidecar else ""
+        rows.append(row)
+    # Recorded, not silently dropped: a link farm would otherwise look like
+    # a collection where nothing needs doing.
+    for link in links:
+        row = dict.fromkeys(COLUMNS, "")
+        row["path"] = relpath(link, ctx.root)
+        row["container"] = link.suffix.lower().lstrip(".")
+        row["issue"] = ("symlink: skipped, because writing here would "
+                        "replace the link with a regular file")
         rows.append(row)
     return rows
 

@@ -47,6 +47,8 @@ from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 from mutagen.wave import WAVE
 
+from .util import is_link
+
 FIELDS = ("artist", "title", "album", "albumartist", "date", "grouping",
          "label", "genre", "tracknumber")
 
@@ -93,6 +95,12 @@ class TagState:
     duration: float | None = None
     bitrate: int | None = None
     has_art: bool = False
+    # Filled while the container is already open. Census used to get this
+    # by calling read_art(), which re-opens and re-parses the whole file --
+    # two complete parses per art-bearing track, one of them purely to
+    # measure a JPEG header.
+    art_min_px: int | None = None
+    art_error: str = ""
     fields: dict[str, str | None] = dc_field(default_factory=dict)
 
     def get(self, name: str) -> str | None:
@@ -164,6 +172,16 @@ def read(path: Path) -> TagState:
                     v = bytes(v).decode("utf-8", "replace")
                 st.fields[name] = str(v)
         st.has_art = bool(tags.get("covr"))
+    if st.has_art:
+        # Best effort, and never fatal: the tags parsed fine, so a picture
+        # block that does not is a property of this file's art, not a
+        # reason to call the file unreadable.
+        try:
+            art = _read_art_from(audio, family)
+            if art:
+                st.art_min_px = image_min_px(art[0])
+        except Exception as e:
+            st.art_error = f"{type(e).__name__}: {e}"
     return st
 
 
@@ -229,6 +247,11 @@ def _atomic_save(path: Path, mutate) -> None:
     torrent it is the safer outcome, since the shared copy is left exactly
     as the tracker expects.
     """
+    # Belt and braces with iter_audio's skip: paths also arrive from
+    # --from-review and restore, which read CSVs a human can edit. A write
+    # here does not go through the link, it replaces it.
+    if is_link(path):
+        raise ProbeError("refusing to write through a symlink")
     tmp = path.with_name(f".{path.stem}.tagfill-tmp{path.suffix}")
     try:
         st = path.stat()
@@ -358,7 +381,28 @@ def delete_fields(path: Path, names: list[str]) -> None:
 # -- art ---------------------------------------------------------------------
 
 def read_art(path: Path) -> tuple[bytes, str] | None:
-    audio, family = _open(path)
+    """Raises ProbeError on a picture block that does not parse.
+
+    has_art only says a picture *comment* is present -- for Ogg and Opus
+    that is the whole check, and the base64 decode and Picture() struct
+    parse happen here. A truncated or crafted one raises binascii.Error or
+    a mutagen error, neither of which is a ProbeError, so census.collect
+    died on it and took every stage with it (census.load() calls run()).
+    One corrupt file in a 100 GB library must cost that file.
+    """
+    try:
+        return _read_art(path)
+    except ProbeError:
+        raise
+    except Exception as e:
+        raise ProbeError(f"unreadable art: {type(e).__name__}: {e}") from e
+
+
+def _read_art(path: Path) -> tuple[bytes, str] | None:
+    return _read_art_from(*_open(path))
+
+
+def _read_art_from(audio, family) -> tuple[bytes, str] | None:
     if family == "id3":
         apics = audio.tags.getall("APIC") if audio.tags else []
         if apics:
@@ -453,6 +497,51 @@ def image_min_px(data: bytes) -> int | None:
 
 def sniff_mime(data: bytes) -> str:
     return "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
+
+
+# Cover art larger than this is not cover art. Bounds what a hostile or
+# broken source can make mutagen hold in memory, and what ends up inside
+# every copy of the track from then on.
+MAX_ART_BYTES = 32 * 1024 * 1024
+_KEEP_AS_IS = {"JPEG", "PNG"}
+_RE_ENCODE = {"BMP", "WEBP", "GIF", "TIFF", "MPO"}
+
+
+def validate_art(data: bytes, min_px: int) -> tuple[bytes, str, int] | None:
+    """Decode it, or do not embed it. Returns (bytes, mime, min_edge_px).
+
+    Local sidecar art always went through this; network art did not. The mb
+    and itunes stages embedded whatever the CDN returned after a header
+    read (image_min_px) and a two-byte magic check (sniff_mime, which calls
+    anything that is not PNG a JPEG). So an HTML error page with plausible
+    dimensions, a WEBP, or a malformed JPEG went into the user's files with
+    a lying MIME -- to be parsed later by every phone, player and car head
+    unit that renders art, most of which have far worse image parsers than
+    Pillow. The trust ordering was backwards: bytes off the network were
+    checked less than bytes off the user's own disk.
+
+    im.load() is the point of this. Image.open only reads a header, so a
+    truncated or crafted file passes it and fails somewhere with no
+    try/except around it later.
+    """
+    if not data or len(data) > MAX_ART_BYTES:
+        return None
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(data)) as im:
+            fmt, px = im.format, min(im.size)
+            if px < min_px:
+                return None
+            im.load()           # a header is not a decode
+            if fmt in _KEEP_AS_IS:
+                return data, ("image/png" if fmt == "PNG" else "image/jpeg"), px
+            if fmt not in _RE_ENCODE:
+                return None
+            buf = io.BytesIO()
+            im.convert("RGB").save(buf, "JPEG", quality=92)
+        return buf.getvalue(), "image/jpeg", px
+    except Exception:
+        return None
 
 
 _SIDECAR_NAMES = (

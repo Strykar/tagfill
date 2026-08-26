@@ -58,6 +58,20 @@ def _write_census(ctx, rows):
             w.writerow(row)
 
 
+def _real_jpeg(px: int = 1200) -> bytes:
+    """A real image, because the stage decodes it now. This used to serve
+    b"fakeartbytes" and assert it got embedded -- which was the bug an
+    external review flagged: bytes off a CDN were trusted more than bytes
+    off the user's own disk, and went into the file with a MIME type
+    sniff_mime had guessed."""
+    import io
+
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (px, px), (90, 40, 120)).save(buf, "JPEG", quality=80)
+    return buf.getvalue()
+
+
 def _mock_itunes(m, artist, album):
     """A search result strong enough to pass both the similarity and margin
     gates, plus an artwork fetch on a separate domain so the two endpoints
@@ -65,7 +79,7 @@ def _mock_itunes(m, artist, album):
     m.get("https://itunes.apple.com/search",
          json={"results": [{"artistName": artist, "collectionName": album,
                             "artworkUrl100": "https://artcdn.example/100x100bb.jpg"}]})
-    m.get("https://artcdn.example/1200x1200bb.jpg", content=b"fakeartbytes",
+    m.get("https://artcdn.example/1200x1200bb.jpg", content=_real_jpeg(),
          headers={"content-type": "image/jpeg"})
 
 

@@ -226,9 +226,16 @@ def run(ctx: Context) -> None:
                                           action="propose", field="art",
                                           new=f"{px}px", evidence=evidence))
             else:
+                checked = probe.validate_art(art, 0)
+                if not checked:
+                    ctx.journal.append(Record(
+                        stage="itunes", path=row["path"], action="reject",
+                        field="art",
+                        evidence={"reason": "not a usable image", "px": px}))
+                    continue
+                data, mime, px = checked
                 ok, _ = guarded_write(ctx, "itunes", row["path"],
-                                      probe.embed_art, path, art,
-                                      probe.sniff_mime(art))
+                                      probe.embed_art, path, data, mime)
                 if ok:
                     ctx.journal.record_write("itunes", ctx.root, path, "art",
                                              None, f"{px}px",

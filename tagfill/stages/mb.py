@@ -213,11 +213,15 @@ def run(ctx: Context) -> None:
                 ctx.journal.record_write("mb", ctx.root, path, f, old, new,
                                          evidence=match.evidence)
             if art and needs_art(path, ctx.cfg.art_min_px):
-                px = probe.image_min_px(art)
-                if px and px >= ctx.cfg.art_min_px:
+                # Same validation local sidecar art gets: decoded, format
+                # checked, re-encoded if it is not already JPEG or PNG.
+                # min_px=0 so an image that decodes but is too small stays
+                # distinguishable from one that is not an image at all.
+                checked = probe.validate_art(art, 0)
+                if checked and checked[2] >= ctx.cfg.art_min_px:
+                    data, mime, px = checked
                     ok, _ = guarded_write(ctx, "mb", row["path"],
-                                          probe.embed_art, path, art,
-                                          probe.sniff_mime(art))
+                                          probe.embed_art, path, data, mime)
                     if ok:
                         ctx.journal.record_write("mb", ctx.root, path, "art",
                                                  None, f"{px}px",
@@ -230,7 +234,10 @@ def run(ctx: Context) -> None:
                     ctx.journal.append(Record(
                         stage="mb", path=row["path"], action="reject",
                         field="art",
-                        evidence={"reason": "undersized", "px": px}))
+                        evidence={
+                            "reason": ("undersized" if checked
+                                       else "not a usable image"),
+                            "px": checked[2] if checked else None}))
         handled += 1
     ctx.say(f"mb: {handled} folders handled "
             f"({'applied' if ctx.apply else 'dry run'})")

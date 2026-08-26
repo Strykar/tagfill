@@ -49,11 +49,21 @@ class TagBackup:
             tags = probe.read(path)
         except probe.ProbeError:
             return
-        art = probe.read_art(path) if tags.has_art else None
+        art, unreadable = None, False
+        if tags.has_art:
+            try:
+                art = probe.read_art(path)
+            except probe.ProbeError:
+                # Backing up a file whose art will not parse is still worth
+                # doing for its tags; recording art=None instead would have
+                # restore strip whatever is actually in there.
+                unreadable = True
         rec = {"path": rel,
                "fields": {f: tags.get(f) for f in probe.FIELDS},
                "art": base64.b64encode(art[0]).decode() if art else None,
                "art_mime": art[1] if art else None}
+        if unreadable:
+            rec["art_unreadable"] = True
         with open(self.path, "a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         self._seen.add(rel)
@@ -70,6 +80,10 @@ def restore(root: Path, backup_file: Path, only: str | None = None) -> int:
     windows = sys.platform == "win32"
     if only and windows:
         only = PureWindowsPath(only).as_posix().casefold()
+    # The workdir is the user's own, so this is self-tampering rather than
+    # an attack -- but "nothing outside root is ever touched" should be
+    # true by construction, not by provenance.
+    root_resolved = root.resolve()
     n = 0
     with open(backup_file, encoding="utf-8") as f:
         for line in f:
@@ -81,6 +95,10 @@ def restore(root: Path, backup_file: Path, only: str | None = None) -> int:
             if only and stored != only:
                 continue
             path = root / rec["path"]
+            try:
+                path.resolve().relative_to(root_resolved)
+            except ValueError:
+                continue
             if not path.exists():
                 continue
             fields = rec.get("fields", {})
@@ -93,7 +111,7 @@ def restore(root: Path, backup_file: Path, only: str | None = None) -> int:
             if rec.get("art"):
                 probe.embed_art(path, base64.b64decode(rec["art"]),
                                 rec.get("art_mime") or "image/jpeg")
-            else:
+            elif not rec.get("art_unreadable"):
                 probe.remove_art(path)
             n += 1
     return n

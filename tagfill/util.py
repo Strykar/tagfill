@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import hashlib
+import os.path
 import re
 import time
 from difflib import SequenceMatcher
@@ -45,8 +46,19 @@ def is_appledouble(path: Path) -> bool:
     return path.name.startswith("._")
 
 
+def is_link(p: Path) -> bool:
+    """A symlink, or a Windows junction, which is a reparse point that
+    is_symlink() does not report. os.path.isjunction arrived in 3.12 and
+    the floor here is 3.11."""
+    if p.is_symlink():
+        return True
+    isjunction = getattr(os.path, "isjunction", None)
+    return bool(isjunction and isjunction(p))
+
+
 def iter_audio(root: Path, excludes: list[str] | None = None,
-               workdir: Path | None = None):
+               workdir: Path | None = None,
+               skipped_links: list[Path] | None = None):
     """Yield audio files under root, skipping AppleDouble stubs, anything
     hidden, the workdir (if it lives inside root) and any exclude globs
     (matched against the path relative to root).
@@ -57,11 +69,27 @@ def iter_audio(root: Path, excludes: list[str] | None = None,
 
     Globs are matched against the POSIX form of the relative path. On Windows
     `str(rel)` yields backslashes, so a perfectly ordinary `["DJ Pool/*"]` in
-    the config would silently match nothing at all."""
+    the config would silently match nothing at all.
+
+    Symlinks are skipped and collected into `skipped_links` if given.
+    `is_file()` follows them, so a link inside the collection pointing
+    outside it used to be censused and written -- and the write does not go
+    *through* the link, it replaces it: copy2 plus os.replace leaves a
+    regular file where the link was, the real target untouched and the
+    content silently forked. Confirmed on a link into a directory outside
+    root. Link-farm layouts are common enough in this audience (dedup
+    setups, beets-style views) that this has to be a rule, not a
+    footnote."""
     excludes = excludes or []
     workdir = workdir.resolve() if workdir else None
     for p in sorted(root.rglob("*")):
-        if not p.is_file() or p.suffix.lower() not in AUDIO_SUFFIXES:
+        if p.suffix.lower() not in AUDIO_SUFFIXES:
+            continue
+        if is_link(p):
+            if skipped_links is not None:
+                skipped_links.append(p)
+            continue
+        if not p.is_file():
             continue
         if is_appledouble(p):
             continue

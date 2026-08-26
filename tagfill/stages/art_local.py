@@ -20,7 +20,6 @@ Images are validated through PIL. BMP sidecars are re-encoded to JPEG.
 
 from __future__ import annotations
 
-import io
 from pathlib import Path
 
 from .. import probe
@@ -29,21 +28,12 @@ from . import Context, guarded_write
 
 
 def _load_image(data: bytes, min_px: int) -> tuple[bytes, str, int] | None:
-    """Validate; returns (data, mime, min_edge_px) or None if unusable."""
-    try:
-        from PIL import Image
-        with Image.open(io.BytesIO(data)) as im:
-            px = min(im.size)
-            if px < min_px:
-                return None
-            if im.format == "BMP":
-                buf = io.BytesIO()
-                im.convert("RGB").save(buf, "JPEG", quality=92)
-                return buf.getvalue(), "image/jpeg", px
-            mime = "image/png" if im.format == "PNG" else "image/jpeg"
-        return data, mime, px
-    except Exception:
-        return None
+    """Validate; returns (data, mime, min_edge_px) or None if unusable.
+
+    One line, because network art has to get exactly this treatment and
+    two validators would drift apart.
+    """
+    return probe.validate_art(data, min_px)
 
 
 def row_needs_art(row: dict, art_min_px: int) -> bool:
@@ -67,7 +57,10 @@ def row_needs_art(row: dict, art_min_px: int) -> bool:
 def needs_art(path, art_min_px: int) -> bool:
     """Absent, or present but below threshold. Filesystem form, used as a
     late re-check once a stage has already selected a target."""
-    art = probe.read_art(path)
+    try:
+        art = probe.read_art(path)
+    except probe.ProbeError:
+        return True             # whatever is in there, it is not usable art
     if art is None:
         return True
     px = probe.image_min_px(art[0])
