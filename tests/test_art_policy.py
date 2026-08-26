@@ -111,3 +111,14 @@ def test_art_local_refuses_loudly_when_pillow_is_missing(tmp_path,
 def test_pillow_available_reports_the_truth():
     from tagfill import probe
     assert probe.pillow_available() is True      # the test env has it
+
+
+@pytest.mark.parametrize("stage", ["mb.py", "itunes.py"])
+def test_every_art_stage_distinguishes_missing_pillow_from_bad_art(stage):
+    """"We looked and it is not an image" and "we have no way to look" are
+    different answers, and only one of them is the user's to fix. mb had
+    the distinction and itunes did not, which is the kind of gap that only
+    shows up on an install without Pillow -- i.e. never on a dev machine."""
+    src = (Path(__file__).resolve().parents[1] / "tagfill" / "stages"
+           / stage).read_text(encoding="utf-8")
+    assert "pillow_available()" in src, f"{stage} cannot tell the two apart"

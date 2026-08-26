@@ -2,9 +2,13 @@
 
 ## Reporting
 
-Open a private security advisory on the repository, or email the address in
-`[musicbrainz].contact` of the maintainer's own config. Please do not open a
+Use **Report a vulnerability** under the repository's Security tab, which
+opens a private advisory only the maintainer can see. Please do not open a
 public issue for anything exploitable.
+
+If that button is not there, private reporting has not been switched on yet
+— open a normal issue saying only that you have a security report and asking
+for a private channel, without the details.
 
 ## What tagfill does to your files
 

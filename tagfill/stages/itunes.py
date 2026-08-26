@@ -228,10 +228,16 @@ def run(ctx: Context) -> None:
             else:
                 checked = probe.validate_art(art, 0)
                 if not checked:
+                    # Same distinction mb makes: "we looked and it is not an
+                    # image" and "we have no way to look" are different
+                    # answers, and only one of them is the user's to fix.
                     ctx.journal.append(Record(
                         stage="itunes", path=row["path"], action="reject",
                         field="art",
-                        evidence={"reason": "not a usable image", "px": px}))
+                        evidence={"reason": (
+                            "pillow not installed, so no image can be checked"
+                            if not probe.pillow_available()
+                            else "not a usable image"), "px": px}))
                     continue
                 data, mime, px = checked
                 ok, _ = guarded_write(ctx, "itunes", row["path"],

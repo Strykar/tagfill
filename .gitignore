@@ -4,6 +4,7 @@ cache/
 dist/
 *.egg-info/
 journal.jsonl
+.coverage
 *.pyc
 __pycache__/
 .claude/
