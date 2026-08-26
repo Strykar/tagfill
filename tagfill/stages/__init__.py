@@ -28,6 +28,18 @@ STAGES = [
 ]
 
 
+class StagePrecondition(RuntimeError):
+    """A stage cannot start: no API key, a missing helper binary, an
+    uninstalled dependency.
+
+    Distinct from "ran and found nothing to do", which is a normal outcome
+    and stays a journal entry. These used to be a ctx.say() and a bare
+    return, so an embedder got prose on stdout and no way to tell a
+    misconfiguration from a clean no-op. Per-file resilience is unchanged:
+    a single unwritable file is still a journalled skip, not this.
+    """
+
+
 @dataclass
 class Context:
     cfg: Config

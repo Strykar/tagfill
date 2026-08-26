@@ -17,6 +17,8 @@ Tags a music collection in place. Your folder structure is something to preserve
 | `sources/itunes.py` | fallback; duration vector from `lookup?entity=song` |
 | `sources/discogs.py` | last resort; community-typed durations, often absent |
 | `stages/__init__.py` | `STAGES` registry + `Context` |
+| `pipeline.py` | the `run` ordering, as a function the CLI calls |
+| `lock.py` | one writer per workdir |
 | `stages/census.py` | measure; defines the file universe |
 | `stages/convert.py` | WAV to FLAC, doubly verified, quarantines originals |
 | `stages/art_local.py` | embed art already on disk |
@@ -77,6 +79,18 @@ Take whatever kwargs you need, absorb the rest in `**_ignored` (the orchestrator
 **Add a container.** One entry in `probe._CONTAINERS`, one in `util.AUDIO_SUFFIXES` (kept separate because `util.py` deliberately imports nothing third-party), and a builder in `test_probe_roundtrip._BUILDERS` — a test fails if those lists diverge, so a new format cannot ship untested. If it reuses an existing tag family that is the whole change: DSD was two lines, since both `.dsf` and `.dff` carry ID3v2. A genuinely new tag format also needs its field-name map alongside `_ID3_FRAMES` / `_VORBIS_KEYS` / `_MP4_KEYS`, and any per-container special-casing — MP4's `trkn` integer-pair atom is the current example — stays inside `probe.py`.
 
 **Add a managed tag.** Append to `probe.FIELDS`, map it per family, add it to `census.COLUMNS`, and have the sources populate it on `SourceMatch`. Fields beyond the core set should be gated on `cfg.extra_tags` the way `genre` and `tracknumber` are.
+
+## Building on it
+
+The workdir is the API. Every piece of state is a file with a documented shape: `census.csv` is the collection model, `journal.jsonl` an append-only record of every decision with its evidence, `unresolved.csv` and `reacquire.csv` are table views, and `review-queue.csv` is a human-in-the-loop queue with an `accept` column — render it, write it back, run `filename --from-review`.
+
+**What is stable.** Read columns and fields *by name* and ignore ones you do not recognise. New census columns and new journal fields will be added; existing ones will not change meaning. `Journal.append` opens, writes one line and closes per record, so tailing `journal.jsonl` gives per-decision progress from a subprocess with no progress API involved.
+
+**Cancelling is safe by construction.** Every write is atomic, the journal is append-only, and the resume guard picks up where a run stopped, so a frontend's cancel button can kill the process outright. There is no cleanup protocol to get wrong. The workdir lock is taken and released by the process that holds it, and a lock left by a dead process is taken over rather than obeyed.
+
+**In-process.** `pipeline.run(ctx, offline=..., convert_wav=...)` is the whole `tagfill run` ordering, and returns `(stage, outcome)` per stage. A stage that cannot start — no API key, no `fpcalc` — raises `StagePrecondition`; per-file failures stay journalled skips. `report.collect(ctx)` returns what `report.run(ctx)` renders. `Context.say` is a plain attribute, so an embedder can replace it with a callback. `probe.py` reads and writes tags atomically for a single file and is usable on its own.
+
+**One writer per workdir**, enforced by `lock`. Concurrent runs race the `census.csv` rewrite; pass separate `--workdir`s to run two collections at once.
 
 ## Future work
 

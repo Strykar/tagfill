@@ -35,19 +35,18 @@ from .. import probe
 from ..journal import Record
 from ..sources import SourceMatch, discogs, itunes, musicbrainz
 from ..util import RateLimiter
-from . import Context, guarded_write
+from . import Context, StagePrecondition, guarded_write
 
 
 def run(ctx: Context) -> None:
     if not ctx.cfg.mb_contact:
-        ctx.say("mb: set [musicbrainz].contact in the config first "
-                "(MusicBrainz requires an identifying user agent)")
-        return
+        raise StagePrecondition(
+            "set [musicbrainz].contact in the config first (MusicBrainz "
+            "requires an identifying user agent)")
     try:
         import requests  # noqa: F401 -- every source needs it; fail fast here
     except ImportError:
-        ctx.say("mb: pip install musicbrainzngs requests")
-        return
+        raise StagePrecondition("pip install musicbrainzngs requests") from None
     from .. import __version__
     mb_limiter = RateLimiter(ctx.cfg.mb_rate_s)
     itunes_limiter = RateLimiter(0.5)

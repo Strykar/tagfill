@@ -23,14 +23,13 @@ import json
 import os
 
 from ..util import CAPTURE_TEXT
-from . import Context
+from . import Context, StagePrecondition
 
 
 def run(ctx: Context) -> None:
     jpath = ctx.workdir / "journal.jsonl"
     if not jpath.exists():
-        ctx.say("submit: no journal; run stage 5 first")
-        return
+        raise StagePrecondition("no journal; run stage 5 first")
     candidates = {}
     with open(jpath, encoding="utf-8") as f:
         for line in f:

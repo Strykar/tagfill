@@ -29,7 +29,19 @@ from ..util import is_appledouble
 from . import Context
 
 
-def run(ctx: Context) -> None:
+def run(ctx: Context) -> dict:
+    """Write the report CSVs, print the text report, and return what it was
+    built from. The return value is the same structures format_text renders,
+    so an embedder does not have to re-read the CSVs it just watched get
+    written."""
+    data = collect(ctx)
+    ctx.say(format_text(ctx.root, data["tracked"], data["stage_counts"],
+                        data["unresolved"], data["reacquire"], data["stubs"],
+                        data["review_queue"], data["progress"]))
+    return data
+
+
+def collect(ctx: Context) -> dict:
     from . import census
     # Checked before census.run(), which creates the baseline if missing --
     # otherwise a first run compares against itself and reports 0% for
@@ -122,9 +134,10 @@ def run(ctx: Context) -> None:
     stubs = [p for p in ctx.root.rglob("._*") if is_appledouble(p)]
     rq = ctx.workdir / "report" / "review-queue.csv"
 
-    ctx.say(format_text(ctx.root, len(rows), stage_counts, unresolved,
-                        reacquire, stubs, rq if rq.exists() else None,
-                        progress))
+    return {"tracked": len(rows), "stage_counts": stage_counts,
+            "unresolved": unresolved, "reacquire": reacquire,
+            "stubs": stubs, "review_queue": rq if rq.exists() else None,
+            "progress": progress}
 
 
 def _render_table(headers: list[str], rows: list[list[str]]) -> list[str]:

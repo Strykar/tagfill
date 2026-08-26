@@ -22,7 +22,7 @@ import subprocess
 
 from ..journal import Record
 from ..util import CAPTURE_TEXT, RateLimiter, is_mb_placeholder
-from . import Context, guarded_write
+from . import Context, StagePrecondition, guarded_write
 
 
 def _fingerprint(path) -> tuple[int, str] | None:
@@ -40,17 +40,15 @@ def _fingerprint(path) -> tuple[int, str] | None:
 def run(ctx: Context) -> None:
     key = ctx.cfg.acoustid_key
     if not key:
-        ctx.say("acoustid: no API key (config [acoustid], $ACOUSTID_API_KEY, "
-                "or key_file). https://acoustid.org/new-application")
-        return
+        raise StagePrecondition(
+            "no API key (config [acoustid], $ACOUSTID_API_KEY, or key_file). "
+            "https://acoustid.org/new-application")
     if shutil.which("fpcalc") is None:
-        ctx.say("acoustid: needs `fpcalc` (chromaprint) on PATH")
-        return
+        raise StagePrecondition("needs `fpcalc` (chromaprint) on PATH")
     try:
         import requests
     except ImportError:
-        ctx.say("acoustid: pip install requests")
-        return
+        raise StagePrecondition("pip install requests") from None
 
     from .. import probe
     from . import census

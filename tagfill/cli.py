@@ -26,7 +26,7 @@ from pathlib import Path
 from . import __version__, config, pipeline
 from .journal import Journal, ReviewQueue
 from .lock import WorkdirBusy, WorkdirLock
-from .stages import STAGES, Context
+from .stages import STAGES, Context, StagePrecondition
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -166,7 +166,13 @@ def main(argv: list[str] | None = None) -> int:
 
             for _num, name, module, _ in STAGES:
                 if name == args.command:
-                    pipeline.stage_module(module).run(ctx)
+                    try:
+                        pipeline.stage_module(module).run(ctx)
+                    except StagePrecondition as e:
+                        # Asked for this stage by name and it cannot start,
+                        # so this is a failed command, not a quiet no-op.
+                        print(f"{name}: {e}")
+                        return 1
                     print("\njournal:")
                     print(ctx.journal.summary())
                     return 0

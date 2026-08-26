@@ -70,7 +70,7 @@ from pathlib import Path
 from .. import probe
 from ..journal import Record
 from ..util import RateLimiter, similarity
-from . import Context, guarded_write
+from . import Context, StagePrecondition, guarded_write
 
 _SAME_IMAGE_TOLERANCE = 0.03  # normalized RGB distance on a 32x32 downsample
 
@@ -110,8 +110,7 @@ def run(ctx: Context) -> None:
     try:
         import requests
     except ImportError:
-        ctx.say("itunes: pip install requests")
-        return
+        raise StagePrecondition("pip install requests") from None
     from . import census
     from .art_local import needs_art, row_needs_art
     limiter = RateLimiter(0.5)

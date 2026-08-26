@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import importlib
 
-from .stages import STAGES, Context
+from .stages import STAGES, Context, StagePrecondition
 
 SUBMIT = 9      # never runs unattended; it posts to MusicBrainz
 CONVERT = 1     # the one stage that replaces a file, so it is opt-in
@@ -41,6 +41,12 @@ def run(ctx: Context, *, offline: bool = False,
             outcomes.append((name, "skipped: --offline"))
             continue
         ctx.say(f"-- stage {num} {name}")
-        stage_module(module).run(ctx)
+        try:
+            stage_module(module).run(ctx)
+        except StagePrecondition as e:
+            # One misconfigured optional stage must not end the pipeline.
+            ctx.say(f"   {name}: {e}")
+            outcomes.append((name, f"refused: {e}"))
+            continue
         outcomes.append((name, "ran"))
     return outcomes

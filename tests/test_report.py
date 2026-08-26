@@ -197,3 +197,38 @@ def test_repeated_journal_entries_across_runs_are_deduped(tmp_path):
     assert row["tried"] == "mb: no candidate passed the gate", (
         "three identical reject records across three sessions must collapse "
         "to one entry, not repeat verbatim")
+
+
+def test_report_returns_what_it_rendered(tmp_path):
+    """External review: run() computed clean intermediate structures and
+    handed them straight to format_text, so an embedder had to re-read the
+    CSVs it had just watched get written."""
+    root = tmp_path / "music"
+    (root / "Some Album").mkdir(parents=True)
+    ctx = _ctx(tmp_path, root)
+
+    data = report.run(ctx)
+
+    assert set(data) == {"tracked", "stage_counts", "unresolved",
+                         "reacquire", "stubs", "review_queue", "progress"}
+    assert data["tracked"] == 0
+
+    # And it agrees with the CSV it wrote, which is the point.
+    with open(ctx.workdir / "report" / "unresolved.csv", newline="",
+              encoding="utf-8") as f:
+        assert [r["path"] for r in csv.DictReader(f)] == \
+            [r["path"] for r in data["unresolved"]]
+
+
+def test_collect_does_not_print(tmp_path, capsys):
+    """The split is only worth having if the compute half is usable on its
+    own."""
+    root = tmp_path / "music"
+    root.mkdir(parents=True)
+    ctx = _ctx(tmp_path, root)
+    capsys.readouterr()
+
+    report.collect(ctx)
+
+    out = capsys.readouterr().out
+    assert "=====" not in out, "collect() rendered a report"

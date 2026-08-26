@@ -39,7 +39,7 @@ import sys
 from .. import probe
 from ..journal import Record
 from ..util import CAPTURE_TEXT
-from . import Context, guarded_write
+from . import Context, StagePrecondition, guarded_write
 
 _PCM_TOLERANCE = 1.0 / (1 << 22)  # ~ one 24-bit quantization step
 
@@ -149,8 +149,7 @@ def _encode_float_wav(src, dst, tmp_dir) -> tuple[bool, dict]:
 
 def run(ctx: Context) -> None:
     if shutil.which("flac") is None or shutil.which("ffmpeg") is None:
-        ctx.say("convert: needs `flac` and `ffmpeg` on PATH; skipping")
-        return
+        raise StagePrecondition("needs `flac` and `ffmpeg` on PATH")
     from . import census
     wavs = [r for r in census.load(ctx)
             if r["container"] == "wav" and not r["issue"]]

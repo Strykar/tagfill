@@ -195,6 +195,8 @@ You will also need these tools, available via package managers like `apt` and `p
 
 ### Windows
 
+Windows caps paths at 260 characters unless [long paths are enabled](https://learn.microsoft.com/windows/win32/fileio/maximum-file-path-limitation). tagfill writes a temp file beside each track while tagging it, which is a little longer than the track's own name, so a collection already close to that limit can fail on the write and not on the scan. The downloaded exe asks Windows for long-path support, so enabling it once fixes this for good.
+
 **Download [tagfill.exe](https://github.com/Strykar/tagfill/releases/latest).** No Python needed — the libraries above are bundled inside it. Put it in a folder of its own, say `C:\tagfill`.
 
 Or, if you already have Python and Git:
