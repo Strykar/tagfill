@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tagfill.stages.filename import (
     clean_stem,
     crate_grouping,
+    folder_is_track_numbered,
     parse_stem,
 )
 
@@ -25,6 +26,9 @@ CASES = [
     ("12B - Some Artist - Some Title", "Some Artist", "Some Title", None, 0.7),
     ("8m - 124 - Open Key Artist - Track", "Open Key Artist", "Track",
      None, 0.7),
+    # Track-numbered album files. Passed numbered_folder=True below,
+    # because without sibling context a leading number is ambiguous with a
+    # numeric artist name ("50 Cent") and is deliberately sent to review.
     ("01 Artist - Title", "Artist", "Title", None, 0.7),
     ("01. Artist - Title", "Artist", "Title", None, 0.7),
     # 112 is a real artist; a bare number with a separator is a BPM prefix
@@ -42,7 +46,10 @@ CASES = [
 
 def test_parse_table():
     for stem, artist, title, label, min_conf in CASES:
-        p = parse_stem(stem)
+        # A leading digit run is only a track number when the siblings say
+        # so; these cases model an album, so say so.
+        numbered = stem[:1].isdigit() and not stem[:2].isalpha()
+        p = parse_stem(stem, numbered_folder=True if numbered else None)
         assert p.artist == artist, f"{stem!r}: artist {p.artist!r} != {artist!r}"
         assert p.title == title, f"{stem!r}: title {p.title!r} != {title!r}"
         assert p.label == label, f"{stem!r}: label {p.label!r} != {label!r}"
@@ -83,3 +90,38 @@ if __name__ == "__main__":
         if name.startswith("test_"):
             fn()
             print(f"ok {name}")
+
+
+def test_a_numeric_artist_name_is_not_eaten_as_a_track_number():
+    """External review: "50 Cent - In Da Club" parsed to artist "Cent" at
+    0.80 -- above the 0.70 default, so written unreviewed, on exactly the
+    untagged files this stage targets. Nothing in the filename separates
+    it from "05 Moby - Porcelain"; only the siblings do."""
+    singles = ["2 Chainz - Birthday Song", "50 Cent - In Da Club",
+               "3 Doors Down - Kryptonite", "98 Degrees - Because of You"]
+    for stem in singles:
+        p = parse_stem(stem, numbered_folder=False)
+        assert p.artist == stem.split(" - ")[0], f"{stem} -> {p.artist}"
+        assert p.confidence >= 0.70
+
+    for stem, artist in [("05 Moby - Porcelain", "Moby"),
+                         ("01 - Portishead - Glory Box", "Portishead")]:
+        p = parse_stem(stem, numbered_folder=True)
+        assert p.artist == artist
+        assert p.confidence >= 0.70
+
+
+def test_an_ambiguous_leading_number_goes_to_review_not_into_the_file():
+    """With no folder context the two shapes are indistinguishable, so the
+    honest answer is a human, not a guess."""
+    for stem in ("50 Cent - In Da Club", "05 Moby - Porcelain"):
+        assert parse_stem(stem).confidence < 0.70
+
+
+def test_folder_is_track_numbered_needs_a_real_sequence():
+    assert folder_is_track_numbered(
+        ["01 One", "02 Two", "03 Three"])
+    assert not folder_is_track_numbered(
+        ["50 Cent - In Da Club"])                      # a lone single
+    assert not folder_is_track_numbered(
+        ["2 Chainz - A", "2 Chainz - B"])              # same number, not a run

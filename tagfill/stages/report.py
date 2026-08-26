@@ -23,6 +23,7 @@ from __future__ import annotations
 import csv
 import json
 from collections import defaultdict
+from pathlib import PurePosixPath
 
 from ..util import is_appledouble
 from . import Context
@@ -97,8 +98,14 @@ def run(ctx: Context) -> None:
         if missing:
             unresolved.append({
                 "path": r["path"], "missing": "+".join(missing),
-                "tried": " | ".join(dict.fromkeys(declined.get(r["path"], [])))
-                        or "(none)",
+                # mb and itunes reject a whole folder at once and journal
+                # it under the folder path, so a per-file lookup alone
+                # misses exactly the album-level decisions this column
+                # exists to explain.
+                "tried": " | ".join(dict.fromkeys(
+                    declined.get(r["path"], [])
+                    + declined.get(str(PurePosixPath(r["path"]).parent), [])
+                )) or "(none)",
             })
 
     with open(report_dir / "unresolved.csv", "w", newline="") as f:

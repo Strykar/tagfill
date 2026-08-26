@@ -30,7 +30,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from . import guarded_write
 
@@ -82,7 +82,26 @@ def clean_stem(stem: str) -> str:
     return s
 
 
-def parse_stem(stem: str) -> Parse:
+def folder_is_track_numbered(stems: list[str]) -> bool:
+    """Do these filenames look like a numbered tracklist?
+
+    The signal that tells "05 Moby - Porcelain" (track five) apart from
+    "50 Cent - In Da Club" (a name that opens with a number). Nothing in
+    either filename distinguishes them -- only the company they keep does.
+    """
+    nums = []
+    for stem in stems:
+        m = re.match(r"^(\d{1,3})[.)]?[\s._-]", stem.strip())
+        if m:
+            nums.append(int(m.group(1)))
+    return len(nums) >= 2 and len(set(nums)) >= 2 and max(nums) <= len(stems) + 5
+
+
+def parse_stem(stem: str, *, numbered_folder: bool | None = None) -> Parse:
+    """`numbered_folder` says whether the siblings look like a tracklist.
+    None means nobody checked, which is treated as unknown rather than as
+    no -- an unknown leading number lands in the review queue instead of
+    being written as an artist name."""
     s, stripped = _strip_prefixes(stem.replace("_", " "))
     label = None
     m = _LABEL.search(s)
@@ -90,10 +109,23 @@ def parse_stem(stem: str) -> Parse:
         label = m.group(1).strip()
         s = s[:m.start()].strip()
 
+    # A leading number is only safely a track number when the siblings
+    # agree. Without that, "50 Cent - In Da Club" was being written as
+    # artist "Cent" at 0.80 -- above the default threshold, so unreviewed,
+    # on exactly the untagged files this stage targets.
+    bare_number = bool(stripped) and _TRACKNO.match(stripped[0]) is not None
+    if bare_number and numbered_folder is False:
+        s, stripped = stem.replace("_", " ").strip(), []
+        m = _LABEL.search(s)
+        if m:
+            s = s[:m.start()].strip()
+
     parts = _SEP.split(s)
     conf = 0.85
     if stripped:
         conf -= 0.05  # a stripped prefix means the layout was noisy
+    if bare_number and numbered_folder is None and len(_SEP.split(s)) >= 2:
+        conf -= 0.20  # ambiguous leading number: let a human look
     if len(parts) >= 2:
         artist = parts[0].strip()
         title = " - ".join(p.strip() for p in parts[1:]).strip()
@@ -137,8 +169,14 @@ def run(ctx) -> None:
         _apply_review(ctx)
         return
 
-    rows = [r for r in census.load(ctx) if not r["issue"]
-            and (not r["artist"] or not r["title"])]
+    all_rows = [r for r in census.load(ctx) if not r["issue"]]
+    numbered: dict[str, bool] = {}
+    for folder in {str(PurePosixPath(r["path"]).parent) for r in all_rows}:
+        stems = [PurePosixPath(r["path"]).stem for r in all_rows
+                 if str(PurePosixPath(r["path"]).parent) == folder]
+        numbered[folder] = folder_is_track_numbered(stems)
+
+    rows = [r for r in all_rows if not r["artist"] or not r["title"]]
     threshold = ctx.cfg.filename_confidence
     proposed = queued = 0
     for row in rows:
@@ -147,7 +185,8 @@ def run(ctx) -> None:
         path = ctx.root / row["path"]
         if not path.exists() or not ctx.within_scope(path):
             continue
-        p = parse_stem(path.stem)
+        p = parse_stem(path.stem, numbered_folder=numbered.get(
+            str(PurePosixPath(row["path"]).parent)))
         values = {}
         if not row["artist"] and p.artist:
             values["artist"] = p.artist
