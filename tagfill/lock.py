@@ -56,6 +56,14 @@ def _alive_win32(pid: int) -> bool:
     ERROR_ACCESS_DENIED means the process is there and not ours to look at,
     which still counts as alive -- treating that as dead would steal a live
     lock.
+
+    Liveness here is identity-blind, on both platforms: a recycled pid
+    reads as the original holder, so a lock left by a killed run can look
+    held forever and the user has to delete the file. Annoying, not
+    dangerous -- the conservative direction. Recording the holder's process
+    creation time alongside the pid would let takeover check identity
+    rather than existence, at the cost of reading /proc/<pid>/stat on Linux
+    and GetProcessTimes on Windows.
     """
     import ctypes
     SYNCHRONIZE = 0x00100000
