@@ -26,6 +26,8 @@ pytest.importorskip("mutagen")
 if not shutil.which("ffmpeg"):
     pytest.skip("needs ffmpeg", allow_module_level=True)
 
+from make_fixtures import vorbis_args
+
 from tagfill import config, probe
 from tagfill.backup import TagBackup
 from tagfill.journal import Journal, ReviewQueue
@@ -37,7 +39,7 @@ def _ogg_with_broken_art(path: Path) -> None:
     everything that tries to read it says otherwise."""
     path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
-                    "sine=frequency=440:duration=1", "-c:a", "libvorbis",
+                    "sine=frequency=440:duration=1", *vorbis_args(),
                     str(path)], check=True)
     from mutagen.oggvorbis import OggVorbis
     audio = OggVorbis(path)
@@ -64,7 +66,7 @@ def test_the_census_survives_and_says_why(tmp_path):
     root = tmp_path / "Music"
     _ogg_with_broken_art(root / "Album" / "broken.ogg")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
-                    "sine=frequency=440:duration=1", "-c:a", "libvorbis",
+                    "sine=frequency=440:duration=1", *vorbis_args(),
                     str(root / "Album" / "fine.ogg")], check=True)
     ctx = _ctx(tmp_path, root)
 
@@ -105,7 +107,7 @@ def test_the_art_size_comes_from_the_same_parse(tmp_path):
     f = tmp_path / "fine.ogg"
     f.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
-                    "sine=frequency=440:duration=1", "-c:a", "libvorbis",
+                    "sine=frequency=440:duration=1", *vorbis_args(),
                     str(f)], check=True)
     import io
 

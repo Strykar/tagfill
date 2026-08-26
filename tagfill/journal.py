@@ -46,7 +46,6 @@ class Journal:
         self.path = workdir / "journal.jsonl"
         self.counts: dict[tuple[str, str], int] = {}
         self._applied: dict[tuple[str, str], dict] | None = None
-        self._fh = None
 
     # Every text handle in the persistence layer names its encoding. The
     # platform default on Windows is the ANSI code page, and this file gets
@@ -61,16 +60,15 @@ class Journal:
         rec.ts = datetime.now().astimezone().isoformat(timespec="seconds")
         key = (rec.stage, rec.action)
         self.counts[key] = self.counts.get(key, 0) + 1
-        # Held open rather than reopened per record. Free on ext4, and
-        # noticeable through Windows filter drivers on a 30k-record apply.
-        # Flushed every time, so the durability story is unchanged: a kill
-        # loses nothing that was already written.
-        if self._fh is None:
-            # Deliberately not a context manager; close releases it.
-            self._fh = open(self.path, "a", encoding="utf-8",  # noqa: SIM115
-                            newline="\n")
-        self._fh.write(json.dumps(rec.__dict__, ensure_ascii=False) + "\n")
-        self._fh.flush()
+        # Opened and closed per record on purpose. Holding it open is
+        # slightly cheaper -- and on Windows an open handle cannot be
+        # deleted or replaced, so it locks the journal for the life of the
+        # process: pytest could not clean up its own tmp dirs, and any
+        # embedder or second tool wanting to compact or move the file is
+        # stuck behind it. Next to the full-file copy and fsync each write
+        # already pays, the saving was not worth a platform-specific lock.
+        with open(self.path, "a", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps(rec.__dict__, ensure_ascii=False) + "\n")
 
     def record_write(self, stage: str, root: Path, path: Path, field: str,
                      old, new, evidence: dict | None = None,
@@ -132,11 +130,6 @@ class Journal:
             return True
         return sha1_head(path) == d.get("sha1_head")
 
-    def close(self) -> None:
-        if self._fh is not None:
-            self._fh.close()
-            self._fh = None
-
     def compact(self) -> tuple[int, int]:
         """Keep the latest apply per (stage, path); drop the rest.
 
@@ -162,7 +155,6 @@ class Journal:
                     continue
                 if d.get("action") == "apply" and d.get("sha1_head"):
                     keep[(d["stage"], d["path"])] = line
-        self.close()
         tmp = self.path.with_suffix(".jsonl.compacting")
         with open(tmp, "w", encoding="utf-8", newline="\n") as f:
             f.writelines(keep.values())

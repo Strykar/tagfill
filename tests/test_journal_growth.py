@@ -70,7 +70,6 @@ def test_a_corrupt_line_does_not_survive_or_crash_compaction(tmp_path):
     j = Journal(tmp_path)
     j.append(Record(stage="mb", path="a.mp3", action="apply", field="genre",
                     size=1, mtime=1.0, sha1_head="x"))
-    j.close()
     with open(j.path, "a", encoding="utf-8") as f:
         f.write('{"action": "apply" broken\n')
     before, after = j.compact()
@@ -81,7 +80,6 @@ def test_the_cli_exposes_it(tmp_path, capsys):
     (tmp_path / "Music").mkdir()
     j = Journal(tmp_path / "work")
     _fill(j)
-    j.close()
 
     rc = cli.main(["--music-dir", str(tmp_path / "Music"),
                    "--workdir", str(tmp_path / "work"), "compact"])
@@ -95,7 +93,6 @@ def test_loading_applies_skips_parsing_proposals(tmp_path, monkeypatch):
     so it has to actually skip the parse."""
     j = Journal(tmp_path)
     _fill(j, applies=1, proposes=20)
-    j.close()
 
     parsed = []
     real = json.loads
@@ -106,14 +103,12 @@ def test_loading_applies_skips_parsing_proposals(tmp_path, monkeypatch):
     assert len(parsed) == 3, "only the apply lines were parsed"
 
 
-def test_the_write_handle_is_not_reopened_per_record(tmp_path, monkeypatch):
-    import builtins
+def test_the_journal_is_not_left_open(tmp_path):
+    """On Windows an open handle cannot be deleted or replaced, so holding
+    one locks the journal for the life of the process. Windows CI found it
+    the roundabout way: pytest could not clean up its own tmp dirs."""
     j = Journal(tmp_path)
-    opens = []
-    real = builtins.open
-    monkeypatch.setattr(builtins, "open",
-                        lambda *a, **k: (opens.append(a[0]), real(*a, **k))[1])
-    for i in range(10):
+    for i in range(5):
         j.append(Record(stage="mb", path=f"{i}.mp3", action="propose"))
-    assert len(opens) == 1
-    j.close()
+    j.path.replace(tmp_path / "moved.jsonl")
+    assert not j.path.exists()
