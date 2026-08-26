@@ -13,6 +13,10 @@ It doesn't do the matching itself. It asks these four, through their own officia
 | [Discogs](https://www.discogs.com/developers) | tags + cover art, last resort | No |
 | [AcoustID](https://acoustid.org) | identifies a track by its audio when nothing else can | Yes — a [free API key](https://acoustid.org/new-application) |
 
+![tagfill filling in a folder's tags and cover art, then undoing it](demo/tagfill.gif)
+
+Above: 56 files that have artist, title and album but no album artist, date, genre, track number or cover art — looked up, filled in, and then put back exactly as they were with `restore`. That corpus ships in [`demo/`](demo/): real album metadata and real track lengths, so the duration matching behaves exactly as it does on a real library, but the audio is silence and it weighs 5 MB.
+
 **Try it, risk-free:** `tagfill --music-dir /path/to/music --report` prints a read-only report on the state of your library.
 
 ```text

@@ -23,3 +23,15 @@ python demo/make_corpus.py --contact you@example.org
 
 `tagfill.cast` is a recording of the above, playable with
 [asciinema](https://asciinema.org): `asciinema play demo/tagfill.cast`.
+
+`tagfill.gif` is that recording rendered for the README, since GitHub
+markdown cannot run the player. Regenerate it after re-recording with
+[agg](https://github.com/asciinema/agg):
+
+```text
+agg --theme asciinema --font-size 16 --idle-time-limit 2.5 \
+    demo/tagfill.cast demo/tagfill.gif
+```
+
+`--idle-time-limit 2.5` is what makes it readable: without it each screen
+of output flashes past faster than anyone can read it.
