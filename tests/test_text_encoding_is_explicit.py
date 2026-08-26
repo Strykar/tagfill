@@ -39,8 +39,11 @@ PKG = Path(tagfill.__file__).parent
 
 # open(...) up to the first close paren, which is enough to see the mode
 # and the kwargs. Binary modes are exempt: bytes have no encoding.
-_OPEN = re.compile(r"\bopen\(([^)]*)\)", re.S)
+_OPEN = re.compile(r"(?<![.\w])(\w+\.)?open\(([^)]*)\)", re.S)
 _BINARY = re.compile(r'"[rwax]\+?b"')
+# Only the builtin takes an encoding. os.open returns a raw fd, and
+# Image.open / probe._open are not file handles at all.
+_NOT_THE_BUILTIN = {"os.", "Image.", "io.", "probe."}
 
 
 def test_no_text_open_relies_on_the_platform_default():
@@ -48,17 +51,14 @@ def test_no_text_open_relies_on_the_platform_default():
     for src in sorted(PKG.rglob("*.py")):
         text = src.read_text(encoding="utf-8")
         for m in _OPEN.finditer(text):
-            args = m.group(1)
-            if args.startswith(("io.BytesIO", "io.StringIO")):
+            qualifier, args = m.group(1), m.group(2)
+            if qualifier in _NOT_THE_BUILTIN:
                 continue
             if _BINARY.search(args) or "encoding=" in args:
                 continue
-            line = text[:m.start()].count("\n") + 1
-            # Image.open and probe._open are not builtins.
-            if re.search(r"(Image|probe)\.open\($",
-                         text[:m.end()].rsplit("open(", 1)[0] + "open("):
-                continue
-            offenders.append(f"{src.relative_to(PKG.parent)}:{line}")
+            offenders.append(
+                f"{src.relative_to(PKG.parent)}:"
+                f"{text[:m.start()].count(chr(10)) + 1}")
     assert not offenders, (
         "text-mode open() without encoding=, which is the ANSI code page on "
         "Windows: " + ", ".join(offenders))

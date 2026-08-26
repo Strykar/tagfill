@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..backup import TagBackup
 from ..config import Config
 from ..journal import Journal, ReviewQueue
 
@@ -37,6 +38,13 @@ class Context:
     limit: int | None = None
     subpath: Path | None = None       # --path restriction
     backup_tags: bool = False
+    # Set when --backup-tags is on; guarded_write snapshots through it.
+    # This used to be a monkeypatch of probe.write and probe.embed_art,
+    # which is process-wide, closed over one workdir, and never uninstalled
+    # -- fine for a CLI that runs one command and exits, wrong for anything
+    # long-lived. A second collection's writes went on flowing through the
+    # first's wrapper and into the first's backup file.
+    backup: TagBackup | None = None
     recheck: bool = False       # ignore the resume guard
     from_review: Path | None = None
     extras: dict = field(default_factory=dict)
@@ -80,6 +88,10 @@ def guarded_write(ctx: Context, stage: str, rel_path: str, op, *args,
     like nothing was ever attempted.
     """
     from ..journal import Record
+    # Every write in every stage comes through here (there is a test that
+    # says so), which makes this the one place a snapshot has to happen.
+    if ctx.backup is not None and args:
+        ctx.backup.snapshot(ctx.root, Path(args[0]))
     try:
         return True, op(*args, **kwargs)
     except Exception as e:

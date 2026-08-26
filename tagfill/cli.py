@@ -20,12 +20,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import importlib
 import sys
 from pathlib import Path
 
-from . import __version__, config
+from . import __version__, config, pipeline
 from .journal import Journal, ReviewQueue
+from .lock import WorkdirBusy, WorkdirLock
 from .stages import STAGES, Context
 
 
@@ -152,51 +152,29 @@ def main(argv: list[str] | None = None) -> int:
                   from_review=getattr(args, "from_review", None))
 
     if ctx.backup_tags and ctx.apply:
-        _install_backup_hook(ctx)
+        from .backup import TagBackup
+        ctx.backup = TagBackup(ctx.workdir)
 
-    if args.command == "run":
-        for num, name, module, network in STAGES:
-            if num == 9:
-                continue  # submit stays explicit
-            if num == 1 and not args.convert_wav:
-                ctx.say(f"-- stage {num} {name}: skipped (pass "
-                       "--convert-wav to enable)")
-                continue
-            if network and args.offline:
-                ctx.say(f"-- stage {num} {name}: skipped (--offline)")
-                continue
-            ctx.say(f"-- stage {num} {name}")
-            importlib.import_module(f".stages.{module}",
-                                    package=__package__).run(ctx)
-        return 0
+    # Anything that writes to the workdir takes the lock. --report and
+    # restore above do not reach here.
+    try:
+        with WorkdirLock(ctx.workdir):
+            if args.command == "run":
+                pipeline.run(ctx, offline=args.offline,
+                             convert_wav=args.convert_wav)
+                return 0
 
-    for _num, name, module, _ in STAGES:
-        if name == args.command:
-            importlib.import_module(f".stages.{module}",
-                                    package=__package__).run(ctx)
-            print("\njournal:")
-            print(ctx.journal.summary())
-            return 0
+            for _num, name, module, _ in STAGES:
+                if name == args.command:
+                    pipeline.stage_module(module).run(ctx)
+                    print("\njournal:")
+                    print(ctx.journal.summary())
+                    return 0
+    except WorkdirBusy as e:
+        print(e)
+        print("pass --workdir to run against a different one")
+        return 1
     return 1
-
-
-def _install_backup_hook(ctx: Context) -> None:
-    """Wrap probe.write/embed_art so every file gets snapshotted before its
-    first modification in this process."""
-    from . import probe
-    from .backup import TagBackup
-    tb = TagBackup(ctx.workdir)
-    real_write, real_embed = probe.write, probe.embed_art
-
-    def write(path, values, overwrite=False):
-        tb.snapshot(ctx.root, Path(path))
-        return real_write(path, values, overwrite)
-
-    def embed_art(path, data, mime):
-        tb.snapshot(ctx.root, Path(path))
-        return real_embed(path, data, mime)
-
-    probe.write, probe.embed_art = write, embed_art
 
 
 if __name__ == "__main__":
