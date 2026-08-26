@@ -147,7 +147,12 @@ def run(ctx: Context) -> None:
             handled += 1
             continue
 
-        art = match.fetch_art()
+        # Fetch only once something actually needs art. This used to run
+        # before the apply check, so a dry run over a large collection paid
+        # a Cover Art Archive request pair per matched folder -- the exact
+        # cost SourceMatch.fetch_art is a callable to avoid.
+        need_art = any(row_needs_art(r, ctx.cfg.art_min_px) for r in rows)
+        art = match.fetch_art() if (ctx.apply and need_art) else None
 
         # The winner owns identity; later sources only fill its blanks.
         # MusicBrainz often matches an album but carries no genre, and
