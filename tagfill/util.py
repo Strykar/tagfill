@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import fnmatch
 import hashlib
 import os.path
@@ -44,6 +45,22 @@ def is_appledouble(path: Path) -> bool:
     """macOS AppleDouble resource-fork stubs (`._*`). They are 4096-byte
     metadata files that a raw `find` happily counts as audio."""
     return path.name.startswith("._")
+
+
+def private_mkdir(path: Path) -> None:
+    """Create the workdir owner-only.
+
+    backup/tags.jsonl holds every tag tagfill has seen plus the full bytes
+    of every cover it replaced, and the journal holds every path in the
+    collection. Default permissions put that at whatever umask says, which
+    on a shared box is usually world-readable. Only applied at creation --
+    a directory someone deliberately opened up is their call.
+    """
+    if path.exists():
+        return
+    path.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError, NotImplementedError):
+        path.chmod(0o700)       # a no-op on Windows, which is fine
 
 
 def is_link(p: Path) -> bool:

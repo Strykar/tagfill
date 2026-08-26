@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import ClassVar
 
-from .util import relpath, sha1_head
+from .util import private_mkdir, relpath, sha1_head
 
 ACTIONS = ("propose", "apply", "reject", "skip")
 
@@ -42,7 +42,7 @@ class Record:
 
 class Journal:
     def __init__(self, workdir: Path):
-        workdir.mkdir(parents=True, exist_ok=True)
+        private_mkdir(workdir)
         self.path = workdir / "journal.jsonl"
         self.counts: dict[tuple[str, str], int] = {}
         self._applied: dict[tuple[str, str], dict] | None = None

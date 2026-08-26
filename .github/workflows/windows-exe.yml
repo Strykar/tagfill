@@ -19,6 +19,10 @@ on:
 permissions:
   contents: write # needed for `gh release`
 
+# Actions are pinned by commit SHA, not by tag. A tag is mutable, and this
+# workflow has contents: write and produces the binary people download.
+# The trailing comment is the human-readable version; the SHA is what runs.
+
 jobs:
   # The exe smoke test only proves argparse runs. Every tag write goes
   # through probe._atomic_save, whose fsync would have failed on Windows
@@ -26,8 +30,8 @@ jobs:
   tests:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Install ffmpeg and flac
@@ -43,16 +47,18 @@ jobs:
     needs: tests
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
       - name: Install tagfill and its network extras
         run: |
           pip install -e .[network]
-          pip install pyinstaller
+          # Pinned: the shipped binary should not depend on whatever PyPI
+          # served that morning.
+          pip install pyinstaller==6.22.2
 
       - name: Build tagfill.exe
         run: pyinstaller packaging/tagfill.spec --distpath dist --workpath build
@@ -63,13 +69,21 @@ jobs:
           mkdir empty-music-dir
           dist/tagfill.exe --music-dir empty-music-dir --report
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tagfill-windows
           path: dist/tagfill.exe
+
+      # Unsigned, so SmartScreen will warn. Until signing is worth the
+      # cost, publish a checksum people can actually check.
+      - name: Checksum
+        run: |
+          $h = (Get-FileHash dist/tagfill.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  tagfill.exe" | Out-File -Encoding ascii dist/SHA256SUMS
+          Get-Content dist/SHA256SUMS
 
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$env:GITHUB_REF_NAME" dist/tagfill.exe --generate-notes --title "$env:GITHUB_REF_NAME"
+        run: gh release create "$env:GITHUB_REF_NAME" dist/tagfill.exe dist/SHA256SUMS --generate-notes --title "$env:GITHUB_REF_NAME"

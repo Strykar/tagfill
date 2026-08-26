@@ -118,6 +118,7 @@ class Config:
     crate_globs: list[str] = field(default_factory=list)
 
     config_dir: Path = Path(".")
+    config_path: Path | None = None
 
     def resolve_path(self, p: str | Path) -> Path:
         p = Path(os.path.expanduser(str(p)))
@@ -162,7 +163,8 @@ def load(path: Path | None) -> Config:
         return cfg
     with open(path, "rb") as f:
         data = tomllib.load(f)
-    cfg.config_dir = Path(path).resolve().parent
+    cfg.config_path = Path(path).resolve()
+    cfg.config_dir = cfg.config_path.parent
 
     coll = data.get("collection", {})
     if "root" in coll:

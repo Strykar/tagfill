@@ -126,6 +126,13 @@ def main(argv: list[str] | None = None) -> int:
     if not cfg.root.is_dir():
         print(f"collection root {cfg.root} is not a directory")
         return 1
+    # Announce both, always. ./tagfill.toml is tried first, so a config
+    # sitting in a downloaded album folder -- the exact place someone cd's
+    # into to try the tool -- silently redefined root and workdir for that
+    # invocation, and nothing in the output said so. Same trust problem
+    # that made git grow safe.directory.
+    print(f"config: {cfg.config_path or '(defaults)'}")
+    print(f"root:   {cfg.root}")
 
     if args.report:
         from .stages import report

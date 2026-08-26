@@ -24,6 +24,8 @@ import os
 import sys
 from pathlib import Path
 
+from .util import private_mkdir
+
 
 class WorkdirBusy(RuntimeError):
     pass
@@ -73,7 +75,7 @@ class WorkdirLock:
     """Context manager. Raises WorkdirBusy if another live run holds it."""
 
     def __init__(self, workdir: Path):
-        workdir.mkdir(parents=True, exist_ok=True)
+        private_mkdir(workdir)
         self.path = workdir / "lock"
         self._held = False
 
