@@ -20,7 +20,27 @@ permissions:
   contents: write # needed for `gh release`
 
 jobs:
+  # The exe smoke test only proves argparse runs. Every tag write goes
+  # through probe._atomic_save, whose fsync would have failed on Windows
+  # while passing on Linux -- so the suite has to actually run here.
+  tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg and flac
+        run: choco install ffmpeg flac -y --no-progress
+      - name: Install tagfill
+        run: pip install -e .[network,test]
+      - name: Build fixtures
+        run: python tests/make_fixtures.py
+      - name: Run the suite on Windows
+        run: pytest tests/ -q
+
   build:
+    needs: tests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
