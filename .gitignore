@@ -1,0 +1,16 @@
+backup/
+build/
+cache/
+dist/
+*.egg-info/
+journal.jsonl
+*.pyc
+__pycache__/
+.claude/
+.pytest_cache/
+.remember/
+.ruff_cache/
+notes/
+report/
+tests/fixtures/
+tagfill.toml

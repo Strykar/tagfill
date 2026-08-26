@@ -1,0 +1,55 @@
+name: windows-exe
+
+# Two jobs in one: every master push builds and smoke-tests the exe as a
+# throwaway artifact, and pushing a v* tag additionally attaches it to a
+# GitHub Release. The release is what the README links to -- build
+# artifacts expire, need a login, and have no stable URL, so they are not
+# something to send a user at.
+#
+# No `paths:` filter. Path filters are not applied to tag pushes the way
+# they are to branch pushes, and a release that silently doesn't build is
+# worse than a couple of wasted CI minutes on a docs-only commit.
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # needed for `gh release`
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tagfill and its network extras
+        run: |
+          pip install -e .[network]
+          pip install pyinstaller
+
+      - name: Build tagfill.exe
+        run: pyinstaller packaging/tagfill.spec --distpath dist --workpath build
+
+      - name: Smoke test
+        run: |
+          dist/tagfill.exe --version
+          mkdir empty-music-dir
+          dist/tagfill.exe --music-dir empty-music-dir --report
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tagfill-windows
+          path: dist/tagfill.exe
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$env:GITHUB_REF_NAME" dist/tagfill.exe --generate-notes --title "$env:GITHUB_REF_NAME"
