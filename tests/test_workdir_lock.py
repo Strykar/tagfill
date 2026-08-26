@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from tagfill.lock import WorkdirBusy, WorkdirLock
+from tagfill.lock import WorkdirBusy, WorkdirLock, _alive
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -102,3 +102,25 @@ def test_report_does_not_need_the_lock(tmp_path):
     from tagfill import cli
     assert cli.main(["--music-dir", str(music), "--workdir", str(work),
                      "--report"]) == 0
+
+
+def test_liveness_is_never_checked_with_a_signal_on_windows():
+    """os.kill(pid, 0) reads as a liveness probe and is not one on Windows:
+    signal 0 is CTRL_C_EVENT, so CPython sends Ctrl+C to the target's
+    console group. Windows CI found it by taking the interrupt itself --
+    pytest died at 83% with a KeyboardInterrupt raised inside _alive.
+
+    This test cannot run that branch on Linux, so it guards the shape: the
+    win32 path must not reach os.kill.
+    """
+    src = (REPO / "tagfill" / "lock.py").read_text(encoding="utf-8")
+    fn = src[src.index("def _alive_win32"):]
+    # Past its own docstring, which quotes the call it must not make.
+    body = fn[fn.index('"""', fn.index('"""') + 3) + 3:]
+    assert "os.kill" not in body
+    assert "OpenProcess" in body
+
+
+def test_the_posix_probe_still_answers_both_ways():
+    assert _alive(os.getpid())
+    assert not _alive(999999)
