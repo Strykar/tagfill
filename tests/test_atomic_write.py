@@ -102,6 +102,7 @@ def test_a_leftover_temp_is_not_mistaken_for_music(tmp_path):
 
 
 @needs_ffmpeg
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX ownership model")
 def test_a_write_does_not_change_ownership_or_permissions(tmp_path):
     """Measured, not assumed: shutil.copy2 carries mode and xattrs but not
     ownership, so a library group-owned by `media` or `audio` had every
@@ -133,6 +134,7 @@ def test_a_write_does_not_change_ownership_or_permissions(tmp_path):
 
 
 @needs_ffmpeg
+@pytest.mark.skipif(not hasattr(os, "setxattr"), reason="no xattr support")
 def test_a_write_preserves_extended_attributes(tmp_path):
     import os
     p = tmp_path / "t.mp3"

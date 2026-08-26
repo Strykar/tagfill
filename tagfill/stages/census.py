@@ -43,7 +43,7 @@ def collect(ctx: Context) -> list[dict]:
     for path in iter_audio(ctx.root, ctx.cfg.exclude, ctx.workdir):
         st = path.stat()
         row = dict.fromkeys(COLUMNS, "")
-        row.update(path=str(path.relative_to(ctx.root)),
+        row.update(path=path.relative_to(ctx.root).as_posix(),
                    container=path.suffix.lower().lstrip("."),
                    size=st.st_size, mtime=f"{st.st_mtime:.6f}")
         if st.st_size == 0:

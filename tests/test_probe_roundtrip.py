@@ -239,6 +239,7 @@ def test_write_reports_the_stored_value_not_the_requested_one(built, tmp_path,
 
 
 @needs_ffmpeg
+@pytest.mark.skipif(sys.platform == "win32", reason="fcntl is POSIX-only")
 def test_fsync_uses_a_writable_handle(tmp_path, monkeypatch):
     """os.fsync on Windows is _commit(), which needs a handle opened for
     writing; a read-only one raises. That failure would land after the temp

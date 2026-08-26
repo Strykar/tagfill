@@ -135,23 +135,25 @@ def test_rate_limiter_monotonic():
     t0 = time.monotonic()
     rl.wait()
     rl.wait()
-    assert time.monotonic() - t0 >= 0.05
+    # Windows' timer granularity is ~15ms, so allow a little slack.
+    assert time.monotonic() - t0 >= 0.04
 
-def test_config_globs_match_on_windows_style_paths():
-    """Config globs are written with forward slashes. On Windows the
-    relative path stringifies with backslashes, so matching str(rel) would
-    silently disable [crates].globs and [collection].exclude entirely --
-    no error, the feature just stops applying."""
+def test_config_globs_match_regardless_of_separator():
+    """Globs are written with forward slashes and matched on as_posix(),
+    so the result does not depend on the host.
+
+    An earlier version asserted that matching str(rel) *fails* on Windows.
+    That was wrong: fnmatch runs both sides through os.path.normcase,
+    which on Windows maps / to a backslash, so the naive match would have
+    worked there. The assertion only looked right because it ran on Linux,
+    where posixpath.normcase is the identity."""
     import fnmatch
     from pathlib import PureWindowsPath
 
     from tagfill.stages.filename import crate_grouping
 
     rel = PureWindowsPath("DJ Pool/Crate A/track.mp3")
-    assert not fnmatch.fnmatch(str(rel), "DJ Pool/*"), (
-        "precondition: the naive match is what fails on Windows")
     assert fnmatch.fnmatch(rel.as_posix(), "DJ Pool/*")
-
     assert crate_grouping(Path("DJ Pool/Crate A/track.mp3"),
                           ["DJ Pool/*"]) == "Crate A"
 
