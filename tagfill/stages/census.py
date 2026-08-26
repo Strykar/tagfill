@@ -16,6 +16,7 @@ collection had twelve 4096-byte `._*.wav` resource-fork stubs that made a raw
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 
 from .. import probe
@@ -135,9 +136,58 @@ def run(ctx: Context) -> None:
 
 def load(ctx: Context) -> list[dict]:
     """Later stages read the census instead of re-walking. Runs stage 0
-    implicitly when it has not been run yet."""
+    implicitly when it has not been run yet, and folds in anything written
+    since that scan."""
     out = ctx.workdir / "census.csv"
     if not out.exists():
         run(ctx)
     with open(out, newline="") as f:
-        return list(csv.DictReader(f))
+        rows = list(csv.DictReader(f))
+    return _fold_in_later_writes(ctx, rows, out.stat().st_mtime)
+
+
+def _fold_in_later_writes(ctx: Context, rows: list[dict],
+                          census_mtime: float) -> list[dict]:
+    """A census is a snapshot, and writing tags makes it stale immediately.
+
+    Without this, a second `tagfill mb --recheck` sees the pre-write census,
+    concludes every folder still has no date/genre/art, and re-queries
+    MusicBrainz for the lot -- the resume guard normally absorbs that, but
+    --recheck is exactly the flag that turns the guard off, and --recheck is
+    what you are told to use after enabling a new field in extra_tags.
+    Replaying the journal is a file read; re-walking the tree is not.
+    """
+    later = _applied_since(ctx, census_mtime)
+    if not later:
+        return rows
+    for row in rows:
+        for field, value in later.get(row["path"], {}).items():
+            if field == "art":
+                row["has_art"] = "1"
+                row["art_min_px"] = value.removesuffix("px")
+            elif field in row:
+                row[field] = value
+    return rows
+
+
+def _applied_since(ctx: Context, census_mtime: float) -> dict[str, dict]:
+    """{relative path: {field: value}} for writes newer than the census.
+
+    Keyed on the record's post-write file mtime rather than its timestamp:
+    a file edited by something other than tagfill after the census was
+    taken must keep the census's reading, not an older journal entry's.
+    """
+    out: dict[str, dict] = {}
+    if not ctx.journal.path.exists():
+        return out
+    with open(ctx.journal.path) as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (d.get("action") == "apply" and d.get("field")
+                    and (d.get("mtime") or 0) > census_mtime):
+                out.setdefault(d["path"], {})[d["field"]] = str(
+                    d.get("new") or "")
+    return out
