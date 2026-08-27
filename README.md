@@ -1,7 +1,9 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.png">
-  <img src="assets/wordmark-white.png" alt="tagfill" width="420">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.png">
+    <img src="assets/wordmark-white.png" alt="tagfill" width="420">
+  </picture>
+</p>
 
 A tool that fills in missing artist, title, album, genre, track number and cover art across a music collection, in place.
 
