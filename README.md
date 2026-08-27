@@ -20,8 +20,6 @@ It doesn't do the matching itself. It asks these four, through their own officia
 
 [![Watch tagfill fill in a folder's tags and cover art, then undo it](demo/poster.png)](demo/tagfill.gif)
 
-**Click to play** — 20 seconds, plays once, no sound. 56 files that have artist, title and album but no album artist, date, genre, track number or cover art — looked up, filled in, and then put back exactly as they were with `restore`. That corpus ships in [`demo/`](demo/): real album metadata and real track lengths, so the duration matching behaves exactly as it does on a real library, but the audio is silence and it weighs 5 MB.
-
 **Try it, risk-free:** `tagfill --music-dir /path/to/music --report` prints a read-only report on the state of your library.
 
 ```text
